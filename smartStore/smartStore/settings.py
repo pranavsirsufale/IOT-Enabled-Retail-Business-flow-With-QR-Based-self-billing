@@ -41,13 +41,13 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': "store",
-        "USER": "root",
-        "PASSWORD": "pass@123",
+        "USER": "store",
+        "PASSWORD": "Store@123",
         "HOST": "localhost",
         "PORT": "3306",
-        "OPTIONS": {
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES"
-        }
+        # "OPTIONS": {
+        #     "init_command": "SET sql_mode='STRICT_TRANS_TABLES"
+        # }
     }
 }
 AUTH_PASSWORD_VALIDATORS = [

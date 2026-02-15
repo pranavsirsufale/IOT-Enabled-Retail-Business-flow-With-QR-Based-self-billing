@@ -4,9 +4,9 @@ from .serializers import StaffSerializer, StaffTypeSerializer
 
 class StaffTypeViewSet(ModelViewSet):
     queryset = StaffType.objects.all()
-    serializerClass = StaffTypeSerializer
+    serializer_class = StaffTypeSerializer
 
 class StaffViewSet(ModelViewSet):
     queryset = Staff.objects.all()
-    serializerClass = StaffSerializer
+    serializer_class = StaffSerializer
 
