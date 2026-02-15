@@ -8,7 +8,7 @@ class StaffType(models.Model):
         return self.type
 
 class Staff(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     name = models.CharField(max_length=50, null=False)
     type = models.ForeignKey(StaffType, on_delete=models.CASCADE)
     isAdmin = models.BooleanField(default=False)
