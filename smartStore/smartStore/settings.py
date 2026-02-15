@@ -10,6 +10,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'app'
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -38,8 +39,15 @@ TEMPLATES = [
 WSGI_APPLICATION = 'smartStore.wsgi.application'
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': "store",
+        "USER": "root",
+        "PASSWORD": "pass@123",
+        "HOST": "localhost",
+        "PORT": "3306",
+        "OPTIONS": {
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES"
+        }
     }
 }
 AUTH_PASSWORD_VALIDATORS = [
