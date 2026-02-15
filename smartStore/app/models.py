@@ -1,4 +1,4 @@
-from models import models
+from django.db import models
 
 class StaffType(models.Model):
     type = models.CharField(max_length=20, unique=True, null=False)
@@ -9,9 +9,9 @@ class StaffType(models.Model):
 class Staff(models.Model):
     name = models.CharField(max_length=50, null=False)
     type = models.ForeignKey(StaffType, on_delete=models.CASCADE)
-    isAdmin = models.BinaryField()
+    isAdmin = models.BinaryField(default=False)
     email = models.EmailField()
-    pnone = models.CharField(max_length=15)
+    phone = models.CharField(max_length=15)
 
     def __str__(self):
         return self.name
@@ -41,10 +41,10 @@ class Product(models.Model):
 
 class Cart(models.Model):
     def __str__(self):
-        return self
+        return f"Cart {self.id}"
 
 class Transaction(models.Model):
-    cart = models.ManyToOneRel(Cart, on_delete=models.CASCADE)
-    product = models.ManyToOneRel(Product, on_delete=models.CASCADE)
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField()
 
