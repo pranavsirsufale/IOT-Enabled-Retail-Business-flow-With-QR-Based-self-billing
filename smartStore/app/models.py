@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 class StaffType(models.Model):
     type = models.CharField(max_length=20, unique=True, null=False)
@@ -7,9 +8,10 @@ class StaffType(models.Model):
         return self.type
 
 class Staff(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=50, null=False)
     type = models.ForeignKey(StaffType, on_delete=models.CASCADE)
-    isAdmin = models.BinaryField(default=False)
+    isAdmin = models.BooleanField(default=False)
     email = models.EmailField()
     phone = models.CharField(max_length=15)
 

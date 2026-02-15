@@ -1,14 +1,17 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser
 from .models import Staff, StaffType, Category, SubCategory, Product
-from .serializers import StaffSerializer, StaffTypeSerializer, CategorySerializer, SubCategorySerializer, ProductSerializer
+from .serializers import StaffCreateSerializer, StaffTypeSerializer, CategorySerializer, SubCategorySerializer, ProductSerializer
 
 class StaffTypeViewSet(ModelViewSet):
     queryset = StaffType.objects.all()
     serializer_class = StaffTypeSerializer
+    permission_classes = [IsAdminUser]
 
 class StaffViewSet(ModelViewSet):
     queryset = Staff.objects.all()
-    serializer_class = StaffSerializer
+    serializer_class = StaffCreateSerializer
 
 class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.all()
