@@ -5,7 +5,6 @@ from app.views import LoginView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-
     path('api/v1/', include('app.urls')),
 
     # Login & token generation
