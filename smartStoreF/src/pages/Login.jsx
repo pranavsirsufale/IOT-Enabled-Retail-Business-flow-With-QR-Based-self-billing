@@ -31,7 +31,7 @@ export default function Login() {
 
     return (
         <form onSubmit={handleLogin}>
-            <h2>Login</h2>
+            <h2>Login Page</h2>
 
             <input
                 placeholder="Username"
