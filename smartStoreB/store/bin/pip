@@ -1,4 +1,4 @@
-#!/home/pranav/store/store/bin/python3
+#!/home/r/project/IOT-Enabled-Retail-Business-flow-With-QR-Based-self-billing/smartStoreB/store/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
