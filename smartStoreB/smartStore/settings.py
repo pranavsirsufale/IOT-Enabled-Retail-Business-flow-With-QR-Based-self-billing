@@ -1,4 +1,5 @@
 from pathlib import Path
+import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-j_q!!85)+pa^rbb=f%cmq9$-&!($ig&ks=n#(bdqr=38my!60c'
 DEBUG = True
@@ -49,6 +50,11 @@ TEMPLATES = [
     },
 ]
 WSGI_APPLICATION = 'smartStore.wsgi.application'
+# DATABASES = {
+#     'default': dj_database_url.parse(
+#         "postgresql://store_su5t_user:ZJ4cOwIRGY0wbJPfsxxhGMqJEann7ZCe@dpg-d6cot0pr0fns739d68ng-a.oregon-postgres.render.com/store_su5t"
+#     )
+# }
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',

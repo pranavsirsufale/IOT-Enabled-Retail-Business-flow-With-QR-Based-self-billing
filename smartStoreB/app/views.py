@@ -7,12 +7,12 @@ from .serializers import StaffCreateSerializer, StaffTypeSerializer, CategorySer
 import json
 from django.views import View
 from django.http import JsonResponse,HttpResponse
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login,logout
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from io import BytesIO
-
+from django.contrib.auth.decorators import login_required
 
 class StaffTypeViewSet(ModelViewSet):
     queryset = StaffType.objects.all()
@@ -83,3 +83,26 @@ class LoginView(View):
                 "status": "error",
                 "message": str(e)
             }, status=400)
+
+
+# ============================
+# Logout API (OUTSIDE CLASS)
+# ============================
+
+@csrf_exempt
+def logout_view(request):
+    if request.method == "POST":
+        logout(request)
+        return JsonResponse({"message": "Logged out successfully"})
+
+
+# ============================
+# Current Logged-in User API (OUTSIDE CLASS)
+# ============================
+
+@login_required
+def current_user(request):
+    return JsonResponse({
+        "username": request.user.username,
+        "email": request.user.email,
+    })
