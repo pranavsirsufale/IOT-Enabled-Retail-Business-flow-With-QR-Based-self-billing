@@ -15,9 +15,9 @@ export default function Dashboard() {
         >
             <div className="text-6xl mb-4 text-blue-600">📦</div>
             <h2 className="text-2xl font-semibold text-gray-800">Products</h2>
-            <p className="text-gray-500 mt-2 text-center">Manage all your products</p>
+            <p className="text-gray-500 mt-2 text-center">Manage all your products</p
         </div>
-
+</div>
         {/* Card 2 */}
         <div 
             onClick={() => navigate("/category-manager")}
