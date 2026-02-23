@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
@@ -8,7 +8,7 @@ export default function QRScanner() {
 
     const [message, setMessage] = useState("Init camera...");
     const [scanning, setScanning] = useState(false);
-    const [lastScanned, setLastScanned] = useState({ text: null, time: 0 });
+    const lastScannedRef = useRef({ text: null, time: 0 });
 
     const playBeep = () => {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -38,7 +38,7 @@ export default function QRScanner() {
                     { facingMode: "environment" },
                     {
                         fps: 30, // Increased FPS for faster scanning
-                        qrbox: { width: 250, height: 250 },
+                        qrbox: { width: 350, height: 250 },
                         formatsToSupport: [
                             Html5QrcodeSupportedFormats.QR_CODE,
                             Html5QrcodeSupportedFormats.UPC_A,
@@ -57,15 +57,15 @@ export default function QRScanner() {
                         // handle success
                         if (isMounted) {
                             const now = Date.now();
-                            // Prevent duplicate scans within 2 seconds
-                            setLastScanned(prev => {
-                                if (prev.text === decodedText && now - prev.time < 2000) {
-                                    return prev;
-                                }
-                                playBeep();
-                                handleDecoded(decodedText);
-                                return { text: decodedText, time: now };
-                            });
+                            const prev = lastScannedRef.current;
+                            // Prevent duplicate scans within 3 seconds
+                            if (prev.text === decodedText && now - prev.time < 3000) {
+                                return;
+                            }
+
+                            lastScannedRef.current = { text: decodedText, time: now };
+                            playBeep();
+                            handleDecoded(decodedText);
                         }
                     },
                     (errorMessage) => {
