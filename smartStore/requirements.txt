@@ -1,0 +1,8 @@
+Django==6.0.2
+mysqlclient==2.2.8
+djangorestframework==3.16.1
+djangorestframework-simplejwt==5.5.1
+qrcode==7.3.1
+Pillow==10.4.0
+django-cors-headers==3.13.0
+dj-database-url==3.1.2
