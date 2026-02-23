@@ -1,63 +1,63 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { Html5Qrcode } from "html5-qrcode";
 
 export default function QRScanner() {
     const { user } = useOutletContext();
     const isAllowed = user?.isAdmin || user?.role?.toLowerCase() === "store manager" || user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "security staff";
 
-    const videoRef = useRef(null);
     const [message, setMessage] = useState("Init camera...");
     const [scanning, setScanning] = useState(false);
 
     useEffect(() => {
         if (!isAllowed) return;
 
-        let stream = null;
-        let detector = null;
-        let rafId = null;
+        let html5QrCode;
+        let isMounted = true;
 
         async function start() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
-                    await videoRef.current.play();
-                }
-
-                // Prefer BarcodeDetector if available
-                if (window.BarcodeDetector) {
-                    detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-
-                    const run = async () => {
-                        try {
-                            const results = await detector.detect(videoRef.current);
-                            if (results && results.length) {
-                                const raw = results[0].rawValue;
-                                handleDecoded(raw);
-                                return; // stop after first
-                            }
-                        } catch (e) {
-                            // ignore frame errors
+                html5QrCode = new Html5Qrcode("qr-reader");
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 }
+                    },
+                    (decodedText, decodedResult) => {
+                        // handle success
+                        if (isMounted) {
+                            handleDecoded(decodedText);
                         }
-                        rafId = requestAnimationFrame(run);
-                    };
-
+                    },
+                    (errorMessage) => {
+                        // parse error, ignore
+                    }
+                );
+                if (isMounted) {
                     setScanning(true);
-                    run();
+                    setMessage("Scanning...");
                 } else {
-                    setMessage("Barcode Detector API not supported in this browser. Use manual SKU input below.");
+                    // If unmounted while starting, stop it
+                    html5QrCode.stop().catch(console.error);
                 }
             } catch (err) {
-                setMessage("Unable to access camera: " + err.message);
+                if (isMounted) {
+                    setMessage("Unable to access camera: " + err);
+                }
             }
         }
 
         start();
 
         return () => {
-            if (rafId) cancelAnimationFrame(rafId);
-            if (stream) {
-                stream.getTracks().forEach((t) => t.stop());
+            isMounted = false;
+            if (html5QrCode && html5QrCode.isScanning && html5QrCode.isScanning) {
+                try {
+                    html5QrCode.stop().catch(err => console.error("Failed to stop scanner", err));
+                } catch (e) {
+                    console.error(e);
+                }
             }
         };
     }, [isAllowed]);
@@ -66,7 +66,7 @@ export default function QRScanner() {
         return <div className="p-8 text-center text-red-600 font-bold">Access Denied.</div>;
     }
 
-    const handleDecoded = async (raw) => {
+    async function handleDecoded(raw) {
         setMessage(`Scanned: ${raw}`);
         // treat raw as SKU, try to find product
         try {
@@ -82,9 +82,9 @@ export default function QRScanner() {
         } catch (e) {
             setMessage("Error fetching products: " + e.message);
         }
-    };
+    }
 
-    const addToCart = (product) => {
+    function addToCart(product) {
         const key = "cart";
         const raw = localStorage.getItem(key);
         let cart = raw ? JSON.parse(raw) : [];
@@ -112,7 +112,7 @@ export default function QRScanner() {
         } catch (e) {
             // ignore
         }
-    };
+    }
 
     // fallback manual SKU input
     const [manualSku, setManualSku] = useState("");
@@ -128,8 +128,7 @@ export default function QRScanner() {
                     <h2 className="text-xl font-semibold mb-4">Scan QR to add product to cart</h2>
 
                     <div className="grid grid-cols-1 gap-4">
-                        <div className="bg-black rounded overflow-hidden">
-                            <video ref={videoRef} className="w-full h-64 object-cover" muted playsInline />
+                        <div className="bg-black rounded overflow-hidden" id="qr-reader" style={{ width: "100%" }}>
                         </div>
 
                         <div className="text-sm text-gray-600">{message}</div>

@@ -1,23 +1,29 @@
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated,IsAdminUser
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from .models import Staff, StaffType, Category, SubCategory, Product
-from .serializers import StaffCreateSerializer, StaffTypeSerializer, CategorySerializer, SubCategorySerializer, ProductSerializer
 import json
-from django.views import View
-from django.http import JsonResponse,HttpResponse
-from django.contrib.auth import authenticate, login,logout
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-import qrcode
 from io import BytesIO
+
+import qrcode
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import Cart, Transaction
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response as DRFResponse
 from django.db import transaction as db_transaction
+from django.http import HttpResponse, JsonResponse
+from django.utils.decorators import method_decorator
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
+
+from .models import Cart, Category, Product, Staff, StaffType, SubCategory, Transaction
+from .serializers import (
+    CategorySerializer, 
+    ProductSerializer, 
+    StaffCreateSerializer,
+    StaffTypeSerializer, 
+    SubCategorySerializer
+)
 
 class StaffTypeViewSet(ModelViewSet):
     queryset = StaffType.objects.all()
@@ -39,9 +45,6 @@ class SubCategoryViewSet(ModelViewSet):
     serializer_class = SubCategorySerializer
     permission_classes = [IsAuthenticated]
 
-# class ProductViewSet(ModelViewSet):
-#     queryset = Product.objects.all()
-#     serializer_class = ProductSerializer
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
@@ -49,24 +52,25 @@ class ProductViewSet(ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def qr(self, request, pk=None):
-        try:
-            product = self.get_object()
-        except:
-            return Response({"error": "Product not found"}, status=404)
+        # DRF automatically raises a 404 if the object doesn't exist
+        product = self.get_object()
 
-        qr = qrcode.make(product.sku)
-
+        qr_img = qrcode.make(product.sku)
         buffer = BytesIO()
-        qr.save(buffer, format="PNG")
+        qr_img.save(buffer, format="PNG")
 
         return HttpResponse(
             buffer.getvalue(),
             content_type="image/png"
         )
 
+
+# ============================
+# Authentication Views
+# ============================
+
 @method_decorator(csrf_exempt, name="dispatch")
 class LoginView(View):
-
     def post(self, request):
         try:
             data = json.loads(request.body or "{}")
@@ -77,26 +81,15 @@ class LoginView(View):
 
             if user is not None:
                 login(request, user)
-                return JsonResponse({
-                    "status": "success",
-                    "message": "Login successful"
-                })
+                return JsonResponse({"status": "success", "message": "Login successful"})
 
-            return JsonResponse({
-                "status": "error",
-                "message": "Invalid credentials"
-            }, status=401)
+            return JsonResponse({"status": "error", "message": "Invalid credentials"}, status=401)
 
+        except json.JSONDecodeError:
+            return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
         except Exception as e:
-            return JsonResponse({
-                "status": "error",
-                "message": str(e)
-            }, status=400)
+            return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-
-# ============================
-# Logout API (OUTSIDE CLASS)
-# ============================
 
 @csrf_exempt
 def logout_view(request):
@@ -104,26 +97,24 @@ def logout_view(request):
         logout(request)
         return JsonResponse({"message": "Logged out successfully"})
 
-
-# ============================
-# Current Logged-in User API (OUTSIDE CLASS)
-# ============================
-
 @login_required
 def current_user(request):
-    # Include staff-related info when available. Fall back to Django user flags.
-    role = None
     # Consider Django's built-in staff/superuser flags as admin by default
     is_admin = bool(request.user.is_staff or request.user.is_superuser)
     name = request.user.get_full_name() or ""
+    role = None
 
     try:
+        # Reverting to your original, explicit query. This is safer!
         staff = Staff.objects.get(user=request.user)
+        
+        # Note: If you do apply the models.py refactor later, you will 
+        # need to change these to staff.staff_type.name and staff.is_admin
         role = staff.type.type if staff.type else None
-        # If Staff record exists, prefer its isAdmin flag but keep Django flags as fallback
         is_admin = bool(staff.isAdmin) or is_admin
         name = staff.name or name
-    except Staff.DoesNotExist:
+        
+    except Staff.DoesNotExist: # <-- Fixes the NameError, no extra imports needed!
         pass
 
     return JsonResponse({
@@ -131,58 +122,100 @@ def current_user(request):
         "email": request.user.email,
         "name": name,
         "role": role,
-        "isAdmin": is_admin,
+        "isAdmin": is_admin, 
         "is_staff": bool(request.user.is_staff),
         "is_superuser": bool(request.user.is_superuser),
-    })
+  })
+# @login_required
+# def current_user(request):
+#     # Consider Django's built-in staff/superuser flags as admin by default
+#     is_admin = bool(request.user.is_staff or request.user.is_superuser)
+#     name = request.user.get_full_name() or ""
+#     role = None
+
+#     try:
+#         # Using the reverse relation 'staff_profile' if you applied the model refactor
+#         staff = request.user.staff_profile 
+#         role = staff.staff_type.name if staff.staff_type else None
+#         is_admin = bool(staff.is_admin) or is_admin
+#         name = staff.name or name
+#     except ObjectDoesNotExist: # Replaced bare except
+#         pass
+
+#     return JsonResponse({
+#         "username": request.user.username,
+#         "email": request.user.email,
+#         "name": name,
+#         "role": role,
+#         "is_admin": is_admin, # Updated to match snake_case standard
+#         "is_staff": bool(request.user.is_staff),
+#         "is_superuser": bool(request.user.is_superuser),
+#     })
 
 
-from rest_framework.permissions import IsAuthenticated
-
+# ============================
+# Cart & Transaction Views
+# ============================
 
 class CartDraftView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # Return draft cart from session
         cart = request.session.get('cart', [])
-        return DRFResponse({"items": cart})
+        return Response({"items": cart})
 
     def post(self, request, *args, **kwargs):
-        # Save cart items to user's session (draft cart, does not affect stock)
         try:
+            # DRF's request.data handles JSON parsing for us
             items = request.data.get('items', [])
             request.session['cart'] = items
             request.session.modified = True
-            return DRFResponse({"status": "ok"})
+            return Response({"status": "ok"})
         except Exception as e:
-            return DRFResponse({"error": str(e)}, status=400)
+            return Response({"error": str(e)}, status=400)
 
 
 class TransactionCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        try:
-            data = request.data if hasattr(request, 'data') else json.loads(request.body or "{}")
-            items = data.get("items", [])
+        # request.data is already parsed by DRF
+        items = request.data.get("items", [])
+        
+        if not items:
+            return Response({"error": "No items provided"}, status=400)
 
+        try:
             with db_transaction.atomic():
                 cart = Cart.objects.create(user=request.user)
-                created = []
-                for it in items:
-                    pid = it.get("id") or it.get("product")
-                    qty = int(it.get("qty", 1))
+                created_items = []
+                
+                for item in items:
+                    pid = item.get("id") or item.get("product")
+                    qty = int(item.get("qty", 1))
+                    
+                    # Excellent use of select_for_update()!
                     product = Product.objects.select_for_update().get(pk=pid)
+                    
                     if product.stock < qty:
-                        raise Exception(f"Insufficient stock for product {product.id}")
+                        # Rollback is automatic when an exception is raised inside atomic()
+                        raise ValueError(f"Insufficient stock for {product.name}. Only {product.stock} left.")
+                    
                     Transaction.objects.create(cart=cart, product=product, quantity=qty)
-                    product.stock = product.stock - qty
+                    product.stock -= qty
                     product.save()
-                    created.append({"product": product.id, "qty": qty})
+                    
+                    created_items.append({"product": product.id, "qty": qty})
 
-            return DRFResponse({"cart": cart.id, "items": created})
+            # Clear the session cart after a successful transaction
+            if 'cart' in request.session:
+                del request.session['cart']
+
+            return Response({"cart_id": cart.id, "items": created_items}, status=201)
+            
         except Product.DoesNotExist:
-            return DRFResponse({"error": "Product not found"}, status=404)
+            return Response({"error": "One or more products not found"}, status=404)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
         except Exception as e:
-            return DRFResponse({"error": str(e)}, status=400)
+            return Response({"error": "An unexpected error occurred"}, status=500)
