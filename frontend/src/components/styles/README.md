@@ -1,0 +1,1 @@
+This folder can hold shared page styles or components. Currently we rely on Tailwind classes, so no extra CSS required.
