@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 export default function QRScanner() {
     const { user } = useOutletContext();
@@ -8,6 +8,22 @@ export default function QRScanner() {
 
     const [message, setMessage] = useState("Init camera...");
     const [scanning, setScanning] = useState(false);
+    const [lastScanned, setLastScanned] = useState({ text: null, time: 0 });
+
+    const playBeep = () => {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800Hz beep
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volume
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1); // 100ms duration
+    };
 
     useEffect(() => {
         if (!isAllowed) return;
@@ -21,13 +37,35 @@ export default function QRScanner() {
                 await html5QrCode.start(
                     { facingMode: "environment" },
                     {
-                        fps: 10,
-                        qrbox: { width: 250, height: 250 }
+                        fps: 30, // Increased FPS for faster scanning
+                        qrbox: { width: 250, height: 250 },
+                        formatsToSupport: [
+                            Html5QrcodeSupportedFormats.QR_CODE,
+                            Html5QrcodeSupportedFormats.UPC_A,
+                            Html5QrcodeSupportedFormats.UPC_E,
+                            Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+                            Html5QrcodeSupportedFormats.EAN_8,
+                            Html5QrcodeSupportedFormats.EAN_13,
+                            Html5QrcodeSupportedFormats.CODE_39,
+                            Html5QrcodeSupportedFormats.CODE_93,
+                            Html5QrcodeSupportedFormats.CODE_128,
+                            Html5QrcodeSupportedFormats.ITF,
+                            Html5QrcodeSupportedFormats.CODABAR
+                        ]
                     },
                     (decodedText, decodedResult) => {
                         // handle success
                         if (isMounted) {
-                            handleDecoded(decodedText);
+                            const now = Date.now();
+                            // Prevent duplicate scans within 2 seconds
+                            setLastScanned(prev => {
+                                if (prev.text === decodedText && now - prev.time < 2000) {
+                                    return prev;
+                                }
+                                playBeep();
+                                handleDecoded(decodedText);
+                                return { text: decodedText, time: now };
+                            });
                         }
                     },
                     (errorMessage) => {
@@ -52,7 +90,7 @@ export default function QRScanner() {
 
         return () => {
             isMounted = false;
-            if (html5QrCode && html5QrCode.isScanning && html5QrCode.isScanning) {
+            if (html5QrCode && html5QrCode.isScanning) {
                 try {
                     html5QrCode.stop().catch(err => console.error("Failed to stop scanner", err));
                 } catch (e) {
@@ -125,7 +163,7 @@ export default function QRScanner() {
         <div className="min-h-screen bg-gray-50 py-12">
             <div className="max-w-3xl mx-auto px-4">
                 <div className="bg-white shadow rounded-lg p-6">
-                    <h2 className="text-xl font-semibold mb-4">Scan QR to add product to cart</h2>
+                    <h2 className="text-xl font-semibold mb-4">Scan QR or Barcode to add product to cart</h2>
 
                     <div className="grid grid-cols-1 gap-4">
                         <div className="bg-black rounded overflow-hidden" id="qr-reader" style={{ width: "100%" }}>
