@@ -21,7 +21,6 @@ export default function QRScanner() {
         oscillator.type = "sine";
         oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // 800Hz beep
         gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volume
-
         oscillator.start();
         oscillator.stop(audioCtx.currentTime + 0.1); // 100ms duration
     };
