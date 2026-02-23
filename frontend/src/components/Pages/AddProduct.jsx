@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
+import { QRCodeCanvas } from "qrcode.react";
 
 export default function AddProduct() {
   const { user } = useOutletContext();
-  const isStoreManagerOrAdmin = user?.isAdmin || user?.role?.toLowerCase() === "store manager" || user?.role?.toLowerCase() === "admin";
+  const isStoreManagerOrAdmin =
+    user?.isAdmin ||
+    user?.role?.toLowerCase() === "store manager" ||
+    user?.role?.toLowerCase() === "admin";
 
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
@@ -15,6 +19,8 @@ export default function AddProduct() {
   const [name, setName] = useState("");
   const [stock, setStock] = useState("");
   const [price, setPrice] = useState("");
+
+  const qrRef = useRef(null);
 
   // Load categories
   useEffect(() => {
@@ -40,21 +46,42 @@ export default function AddProduct() {
   }, [selectedCategory, isStoreManagerOrAdmin]);
 
   if (!isStoreManagerOrAdmin) {
-    return <div className="p-8 text-center text-red-600 font-bold">Access Denied. Store Managers and Admins only.</div>;
+    return (
+      <div className="p-8 text-center text-red-600 font-bold">
+        Access Denied. Store Managers and Admins only.
+      </div>
+    );
   }
+
+  // Download QR Code
+  const downloadQR = () => {
+    const canvas = qrRef.current.querySelector("canvas");
+    const image = canvas.toDataURL("image/png");
+
+    const link = document.createElement("a");
+    link.href = image;
+    link.download = `${sku}_QR.png`;
+    link.click();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const getCookie = (name) => {
-      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-      return v ? v.pop() : '';
+      const v = document.cookie.match(
+        "(^|;)\\s*" + name + "\\s*=\\s*([^;]+)"
+      );
+      return v ? v.pop() : "";
     };
-    const csrf = getCookie('csrftoken');
+
+    const csrf = getCookie("csrftoken");
 
     const res = await fetch("/api/v1/product/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrf,
+      },
       credentials: "include",
       body: JSON.stringify({
         sku,
@@ -66,11 +93,13 @@ export default function AddProduct() {
     });
 
     if (res.ok) {
-      alert("Product Added");
+      alert("Product Added Successfully");
       setSku("");
       setName("");
       setStock("");
       setPrice("");
+      setSelectedCategory("");
+      setSelectedSubCategory("");
     } else {
       const d = await res.json();
       alert("Error: " + (d.detail || d.error || JSON.stringify(d)));
@@ -84,6 +113,7 @@ export default function AddProduct() {
           <h2 className="text-2xl font-semibold mb-6">Add Product</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* SKU & Name */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <input
                 className="w-full p-2 border rounded"
@@ -95,13 +125,14 @@ export default function AddProduct() {
 
               <input
                 className="w-full p-2 border rounded"
-                placeholder="Name"
+                placeholder="Product Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
 
+            {/* Stock & Price */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <input
                 type="number"
@@ -122,6 +153,7 @@ export default function AddProduct() {
               />
             </div>
 
+            {/* Category & SubCategory */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <select
                 className="w-full p-2 border rounded"
@@ -152,8 +184,40 @@ export default function AddProduct() {
               </select>
             </div>
 
+            {/* QR Code Section */}
+            {sku && (
+              <div className="mt-6 border rounded p-4 bg-gray-50 text-center">
+                <h3 className="font-semibold mb-2">QR Code (SKU)</h3>
+
+                <div ref={qrRef} className="flex justify-center">
+                  <QRCodeCanvas
+                    value={sku}
+                    size={180}
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                    level="H"
+                    includeMargin
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={downloadQR}
+                  className="mt-4 bg-green-600 text-white px-4 py-2 rounded"
+                >
+                  Download QR Code
+                </button>
+              </div>
+            )}
+
+            {/* Submit */}
             <div className="flex justify-end">
-              <button className="bg-blue-600 text-white py-2 px-4 rounded">Add Product</button>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white py-2 px-4 rounded"
+              >
+                Add Product
+              </button>
             </div>
           </form>
         </div>
