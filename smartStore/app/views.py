@@ -18,37 +18,39 @@ from rest_framework.viewsets import ModelViewSet
 
 from .models import Cart, Category, Product, Staff, StaffType, SubCategory, Transaction
 from .serializers import (
+    CartSerializer,
     CategorySerializer, 
     ProductSerializer, 
     StaffCreateSerializer,
     StaffTypeSerializer, 
     SubCategorySerializer
 )
+from .permissions import IsAdminOrStoreManager, IsStaffMemberReadOnly
 
 class StaffTypeViewSet(ModelViewSet):
     queryset = StaffType.objects.all()
     serializer_class = StaffTypeSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated, IsStaffMemberReadOnly]
 
 class StaffViewSet(ModelViewSet):
     queryset = Staff.objects.all()
     serializer_class = StaffCreateSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated, IsAdminOrStoreManager]
 
 class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsStaffMemberReadOnly]
 
 class SubCategoryViewSet(ModelViewSet):
     queryset = SubCategory.objects.all()
     serializer_class = SubCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsStaffMemberReadOnly]
 
 class ProductViewSet(ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsStaffMemberReadOnly]
 
     @action(detail=True, methods=["get"])
     def qr(self, request, pk=None):
@@ -219,3 +221,14 @@ class TransactionCreateView(APIView):
             return Response({"error": str(e)}, status=400)
         except Exception as e:
             return Response({"error": "An unexpected error occurred"}, status=500)
+
+from rest_framework.generics import ListAPIView
+class OrderHistoryView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CartSerializer
+
+    def get_queryset(self):
+        # We also prefetch related transactions -> products to avoid N+1 queries
+        return Cart.objects.filter(user=self.request.user).prefetch_related(
+            "transaction_set", "transaction_set__product"
+        ).order_by("-created_at")

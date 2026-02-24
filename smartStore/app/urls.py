@@ -13,11 +13,11 @@ from .views import (
     TransactionCreateView,
     current_user,
     logout_view,
+    OrderHistoryView,
 )
-
 router = DefaultRouter()
 
-# RESTful convention prefers plural nouns for resource endpoints
+# Keep these, they are proper ViewSets
 router.register(r"staff-types", StaffTypeViewSet, basename="staff-type")
 router.register(r"staff", StaffViewSet, basename="staff")
 router.register(r"category", CategoryViewSet, basename="category")
@@ -31,9 +31,9 @@ urlpatterns = [
     path("me/", current_user, name="current-user"),
     
     # Cart & Transaction Endpoints
-    # A GET request here fetches the cart, a POST request saves it
     path("cart/", CartDraftView.as_view(), name="cart-draft"), 
     path("transactions/", TransactionCreateView.as_view(), name="transaction-create"),
+    path("orders/", OrderHistoryView.as_view(), name="order-history"),
 
     # Include DRF Router URLs
     path("", include(router.urls)),
