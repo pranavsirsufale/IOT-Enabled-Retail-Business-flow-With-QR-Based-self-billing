@@ -57,14 +57,27 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class CartSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Cart
-        fields = "__all__"
-
-
 class TransactionSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
     class Meta:
         model = Transaction
-        fields = "__all__"
+        fields = ["id", "product", "quantity"]
+
+class CartSerializer(serializers.ModelSerializer):
+    transactions = TransactionSerializer(source="transaction_set", many=True, read_only=True)
+    total_amount = serializers.SerializerMethodField()
+    item_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cart
+        fields = ["id", "created_at", "total_amount", "item_count", "transactions"]
+
+    def get_total_amount(self, obj):
+        total = 0
+        for t in obj.transaction_set.all():
+            total += t.product.price * t.quantity
+        return total
+
+    def get_item_count(self, obj):
+        return sum(t.quantity for t in obj.transaction_set.all())
 

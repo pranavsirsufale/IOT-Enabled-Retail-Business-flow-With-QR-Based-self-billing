@@ -1,31 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import logoImg from '../../assets/bamulogo.png';
 
-export default function Header() {
-    const [user, setUser] = useState(null);
+export default function Header({ user, setUser, loading }) {
     const [open, setOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
-
-    // 1. Check if user is already logged in
-    useEffect(() => {
-        fetch("/api/v1/me/", { credentials: "include" })
-            .then((res) => {
-                if (!res.ok || res.redirected || !res.headers.get("content-type")?.includes("application/json")) {
-                    throw new Error("Guest user");
-                }
-                return res.json();
-            })
-            .then((data) => {
-                setUser(data);
-                setLoading(false);
-            })
-            .catch(() => {
-                setUser(null);
-                setLoading(false);
-            });
-    }, []);
 
     // 2. Logout function
     const handleLogout = async () => {
@@ -36,8 +15,8 @@ export default function Header() {
             });
             setUser(null); // Instantly switches UI to show "Login" button
             setOpen(false);
-            // Force a full page reload to clear any cached state
-            window.location.href = "/login";
+            // navigate to login instead of full reload if state is managed correctly
+            navigate("/login");
         } catch (err) {
             console.error("Logout failed", err);
         }
@@ -116,7 +95,7 @@ export default function Header() {
                             </li>
                             {user && (
                                 <>
-                                    {(user.isAdmin || user.role?.toLowerCase() === "store manager" || user.role?.toLowerCase() === "admin") && (
+                                    {(user.isAdmin || user.role?.toLowerCase() === "store manager" || user.role?.toLowerCase() === "admin" || user.role?.toLowerCase() === "staff member") && (
                                         <li>
                                             <NavLink to="/product" className={({ isActive }) =>
                                                 `block py-2 pr-4 pl-3 duration-200 ${isActive ? "text-orange-700 font-bold" : "text-gray-700"} hover:text-orange-700 lg:p-0`
@@ -126,7 +105,7 @@ export default function Header() {
                                         </li>
                                     )}
 
-                                    {(user.isAdmin || user.role?.toLowerCase() === "store manager" || user.role?.toLowerCase() === "admin" || user.role?.toLowerCase() === "security staff") && (
+                                    {(user.isAdmin || user.role?.toLowerCase() === "store manager" || user.role?.toLowerCase() === "admin" || user.role?.toLowerCase() === "staff member") && (
                                         <>
                                             <li>
                                                 <NavLink to="/scan" className={({ isActive }) =>
@@ -145,7 +124,7 @@ export default function Header() {
                                             </li>
                                         </>
                                     )}
-                                    {user.isAdmin && (
+                                    {user.isAdmin && user.role?.toLowerCase() !== "store manager" && (
                                         <li>
                                             <NavLink to="/staff" className={({ isActive }) =>
                                                 `block py-2 pr-4 pl-3 duration-200 ${isActive ? "text-orange-700 font-bold" : "text-gray-700"} hover:text-orange-700 lg:p-0`

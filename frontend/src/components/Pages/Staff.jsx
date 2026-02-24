@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 
 export default function Staff() {
     const { user } = useOutletContext();
-    const isAllowed = user?.isAdmin || user?.role?.toLowerCase() === "admin";
+    const isAllowed = user?.isAdmin || user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "store manager";
 
     const [staffTypes, setStaffTypes] = useState([]);
     const [newType, setNewType] = useState("");
@@ -18,6 +18,13 @@ export default function Staff() {
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [selectedType, setSelectedType] = useState("");
+
+    const loadTypes = () => {
+        fetch("/api/v1/staff-types/", { credentials: "include" })
+            .then((r) => r.json())
+            .then((data) => setStaffTypes(data))
+            .catch(() => setStaffTypes([]));
+    };
 
     useEffect(() => {
         if (!isAllowed) return;
@@ -35,17 +42,6 @@ export default function Staff() {
 
         loadTypes();
     }, [isAllowed]);
-
-    if (!isAllowed) {
-        return <div className="p-8 text-center text-red-600 font-bold">Access Denied. Admins only.</div>;
-    }
-
-    const loadTypes = () => {
-        fetch("/api/v1/staff-types/", { credentials: "include" })
-            .then((r) => r.json())
-            .then((data) => setStaffTypes(data))
-            .catch(() => setStaffTypes([]));
-    };
 
     const handleAddType = async (e) => {
         e.preventDefault();
@@ -113,7 +109,10 @@ export default function Staff() {
 
     if (meLoading) return <div className="p-8">Loading...</div>;
 
-    if (!me || !isAdmin) return <div className="p-8">Unauthorized. Admins only.</div>;
+    const currentRole = me?.role?.toLowerCase();
+    const isAuthorized = isAdmin || currentRole === "admin" || currentRole === "store manager";
+
+    if (!me || !isAuthorized) return <div className="p-8">Unauthorized. Admins and Store Managers only.</div>;
 
     return (
         <div className="min-h-screen bg-gray-50 py-12">
