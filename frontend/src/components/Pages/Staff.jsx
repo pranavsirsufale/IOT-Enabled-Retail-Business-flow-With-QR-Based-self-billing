@@ -3,7 +3,7 @@ import { useOutletContext } from "react-router-dom";
 
 export default function Staff() {
     const { user } = useOutletContext();
-    const isAllowed = user?.isAdmin || user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "store manager";
+    const isAllowed = user?.isAdmin || user?.role?.toLowerCase() === "admin";
 
     const [staffTypes, setStaffTypes] = useState([]);
     const [newType, setNewType] = useState("");
@@ -110,9 +110,9 @@ export default function Staff() {
     if (meLoading) return <div className="p-8">Loading...</div>;
 
     const currentRole = me?.role?.toLowerCase();
-    const isAuthorized = isAdmin || currentRole === "admin" || currentRole === "store manager";
+    const isAuthorized = isAdmin || currentRole === "admin";
 
-    if (!me || !isAuthorized) return <div className="p-8">Unauthorized. Admins and Store Managers only.</div>;
+    if (!me || !isAuthorized) return <div className="p-8">Unauthorized. Admins only.</div>;
 
     return (
         <div className="min-h-screen bg-gray-50 py-12">

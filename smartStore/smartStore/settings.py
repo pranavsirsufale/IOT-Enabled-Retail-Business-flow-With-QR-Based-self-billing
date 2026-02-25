@@ -65,6 +65,10 @@ WSGI_APPLICATION = 'smartStore.wsgi.application'
 #         "postgresql://store_su5t_user:ZJ4cOwIRGY0wbJPfsxxhGMqJEann7ZCe@dpg-d6cot0pr0fns739d68ng-a.oregon-postgres.render.com/store_su5t"
 #     )
 # }
+# DATABASES = {
+#     # This reads your URL string directly
+#     'default': dj_database_url.parse('mysql://store_finefellup:29f885175d586f289a3d2b78b993089fc92359f7@rywkqr.h.filess.io:61002/store_finefellup')
+#   }
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -75,6 +79,7 @@ DATABASES = {
         "PORT": "3306"
     }
 }
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',

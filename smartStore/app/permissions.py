@@ -15,8 +15,15 @@ class IsAdminOrStoreManager(permissions.BasePermission):
         try:
             # Check if user has a Staff profile
             if hasattr(request.user, 'staff'):
-                staff_type = request.user.staff.type.type
-                return staff_type in ['admin', 'store_manager']
+                staff_type_raw = request.user.staff.type.type
+                staff_type = staff_type_raw.lower().replace(" ", "_")
+                
+                # If creating new staff, ONLY admin is allowed
+                if request.method == 'POST' and getattr(view, 'basename', '') == 'staff':
+                    return staff_type == 'admin' or request.user.staff.isAdmin
+
+                # Allow access if type matches known roles
+                return staff_type in ['admin', 'store_manager'] or request.user.staff.isAdmin
         except Exception:
             pass
             
