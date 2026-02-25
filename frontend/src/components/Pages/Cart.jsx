@@ -87,14 +87,26 @@ export default function Cart() {
 
     const processPaymentAndCheckout = async () => {
         setProcessingPayment(true);
+
+        // Open window immediately to bypass popup blocker
+        let printWindow = null;
+        try {
+            printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.write('<html><head><title>Processing</title></head><body><div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><h2>Processing Payment... Please wait. Do not close this window.</h2></div></body></html>');
+            }
+        } catch (e) {
+            console.error("Popup blocked", e);
+        }
+
         // Simulate payment delay
         await new Promise(resolve => setTimeout(resolve, 1500));
-        await handleActualTransaction();
+        await handleActualTransaction(printWindow);
         setProcessingPayment(false);
         setShowPaymentModal(false);
     };
 
-    const handleActualTransaction = async () => {
+    const handleActualTransaction = async (printWindow) => {
         setLoadingCheckout(true);
         try {
             // verify session
@@ -102,6 +114,7 @@ export default function Cart() {
             if (!me.ok) {
                 setLoadingCheckout(false);
                 setError('You must be logged in to checkout');
+                if (printWindow) printWindow.close();
                 return;
             }
 
@@ -145,6 +158,9 @@ export default function Cart() {
                                         body{font-family: Arial, Helvetica, sans-serif; padding:20px}
                                         .header{text-align:center;margin-bottom:20px}
                                         table{border-collapse:collapse;width:100%}
+                                        @media print {
+                                            .no-print { display: none; }
+                                        }
                                     </style>
                                 </head>
                                 <body>
@@ -174,24 +190,36 @@ export default function Cart() {
                                         </tfoot>
                                     </table>
                                     <script>
-                                        window.onload = function(){ window.print(); };
+                                        window.onload = function(){ 
+                                            setTimeout(function() {
+                                                window.print();
+                                                // Optional: window.close() after print if desired (browser dependent)
+                                            }, 500); 
+                                        };
                                     </script>
                                 </body>
                                 </html>`;
 
-                const w = window.open('', '_blank');
-                if (w) {
-                    w.document.write(receiptHtml);
-                    w.document.close();
+                if (printWindow) {
+                    printWindow.document.open();
+                    printWindow.document.write(receiptHtml);
+                    printWindow.document.close();
                 } else {
-                    // fallback alert
-                    alert('Transaction saved. Unable to open print window.');
+                    // Try opening again (less likely to work if blocked before) or alert
+                    const w = window.open('', '_blank');
+                    if (w) {
+                        w.document.write(receiptHtml);
+                        w.document.close();
+                    } else {
+                        alert('Transaction saved successfully! Please enable popups to print receipt.');
+                    }
                 }
 
                 localStorage.removeItem('cart');
                 setCart([]);
                 navigate('/dashboard');
             } else {
+                if (printWindow) printWindow.close();
                 const contentType = res.headers.get("content-type");
                 if (contentType && contentType.includes("application/json")) {
                     const data = await res.json();
@@ -201,6 +229,7 @@ export default function Cart() {
                 }
             }
         } catch (e) {
+            if (printWindow) printWindow.close();
             setError('Network error: ' + e.message);
         } finally {
             setLoadingCheckout(false);
@@ -343,10 +372,13 @@ export default function Cart() {
             {/* Payment Modal */}
             {showPaymentModal && (
                 <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowPaymentModal(false)}></div>
-                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-                        <div className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                    {/* Background overlay */}
+                    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowPaymentModal(false)}></div>
+
+                    {/* Modal positioning */}
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+                        {/* Modal panel */}
+                        <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                             <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                                 <div className="sm:flex sm:items-start">
                                     <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
