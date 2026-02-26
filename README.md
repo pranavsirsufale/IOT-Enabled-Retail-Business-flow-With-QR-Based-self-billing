@@ -1,5 +1,12 @@
 # IoT-Enabled Retail Business Flow With QR-Based Self-Billing
 
+![Project](https://img.shields.io/badge/Project-IoT%20Smart%20Store-blue)
+![Backend](https://img.shields.io/badge/Backend-Django-green)
+![Frontend](https://img.shields.io/badge/Frontend-React-blue)
+![Database](https://img.shields.io/badge/Database-PostgreSQL-orange)
+![License](https://img.shields.io/badge/License-Academic-lightgrey)
+
+---
 This project is a modern, IoT-based Smart Retail Billing System designed to streamline the in-store shopping experience. It allows customers to scan product QR codes using a web application, manage a digital cart, and complete a self-checkout process, effectively eliminating the need to wait in long billing queues.
 
 The system integrates a React frontend with a Django backend to provide a seamless flow from product scanning to final payment and receipt generation.
