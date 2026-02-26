@@ -1,5 +1,4 @@
 # IoT-Enabled Retail Business Flow With QR-Based Self-Billing
-[![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/pranavsirsufale/IOT-Enabled-Retail-Business-flow-With-QR-Based-self-billing)
 
 This project is a modern, IoT-based Smart Retail Billing System designed to streamline the in-store shopping experience. It allows customers to scan product QR codes using a web application, manage a digital cart, and complete a self-checkout process, effectively eliminating the need to wait in long billing queues.
 
