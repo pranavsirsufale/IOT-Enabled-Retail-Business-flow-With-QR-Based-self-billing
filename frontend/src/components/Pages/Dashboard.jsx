@@ -71,7 +71,7 @@ export default function Dashboard() {
         </svg>
       ),
       path: "/staff",
-      allowed: isStoreManagerOrAdmin,
+      allowed: user?.isAdmin || user?.role?.toLowerCase() === "admin",
       color: "bg-blue-50",
     }
   ];

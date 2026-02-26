@@ -15,8 +15,20 @@ class IsAdminOrStoreManager(permissions.BasePermission):
         try:
             # Check if user has a Staff profile
             if hasattr(request.user, 'staff'):
-                staff_type = request.user.staff.type.type
-                return staff_type in ['admin', 'store_manager']
+                staff_type_raw = request.user.staff.type.type
+                staff_type = staff_type_raw.lower().replace(" ", "_")
+                
+                # If interacting with STAFF management
+                if getattr(view, 'basename', '') == 'staff':
+                    # Creating (POST) is ONLY for Admin
+                    if request.method == 'POST':
+                        return staff_type == 'admin' or request.user.staff.isAdmin
+                    
+                    # Other actions (PUT, DELETE, GET) are allowed for Store Manager
+                    return staff_type in ['admin', 'store_manager'] or request.user.staff.isAdmin
+
+                # For all other ViewSets (Products, Categories, etc.), both have access
+                return staff_type in ['admin', 'store_manager'] or request.user.staff.isAdmin
         except Exception:
             pass
             
@@ -41,8 +53,10 @@ class IsStaffMemberReadOnly(permissions.BasePermission):
 
         try:
             if hasattr(request.user, 'staff'):
-                staff_type = request.user.staff.type.type
-                return staff_type in ['admin', 'store_manager']
+                staff_type_raw = request.user.staff.type.type
+                staff_type = staff_type_raw.lower().replace(" ", "_")
+                
+                return staff_type in ['admin', 'store_manager'] or request.user.staff.isAdmin
         except Exception:
             pass
             
