@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 
 export default function Cart() {
@@ -13,26 +13,89 @@ export default function Cart() {
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [processingPayment, setProcessingPayment] = useState(false);
     const [loadingCheckout, setLoadingCheckout] = useState(false);
+    const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [error, setError] = useState(null);
+    const [receiptData, setReceiptData] = useState(null);
 
+    // Poll server for cart updates (Scanner Integration)
     useEffect(() => {
         if (!isAllowed) return;
 
-        const raw = localStorage.getItem("cart");
-        setCart(raw ? JSON.parse(raw) : []);
-        // If localStorage is empty, try to load server-side draft cart
-        if (!raw) {
-            fetch('/api/v1/cart/', { credentials: 'include' })
-                .then((r) => r.json())
-                .then((d) => {
-                    if (d && Array.isArray(d.items) && d.items.length) {
-                        localStorage.setItem('cart', JSON.stringify(d.items));
-                        setCart(d.items);
-                    }
-                })
-                .catch(() => { });
-        }
+        const fetchCart = async () => {
+            try {
+                const res = await fetch('/api/v1/cart/');
+                if (!res.ok) throw new Error(res.status);
+
+                const data = await res.json();
+                if (data && Array.isArray(data.cart)) {
+                    setCart(data.cart);
+                    localStorage.setItem('cart', JSON.stringify(data.cart));
+                } else if (data && Array.isArray(data.items)) {
+                    setCart(data.items);
+                    localStorage.setItem('cart', JSON.stringify(data.items));
+                }
+            } catch (e) {
+                console.error("Cart sync error", e);
+            }
+        };
+
+        fetchCart();
+        const interval = setInterval(fetchCart, 1000);
+        return () => clearInterval(interval);
     }, [isAllowed]);
+
+    // Receipt Component for Printing
+    const Receipt = ({ data }) => {
+        if (!data) return null;
+        return (
+            <div id="printable-receipt" className="hidden print:block p-4 font-mono text-sm w-[300px]">
+                <div className="text-center mb-4">
+                    <h2 className="text-xl font-bold">SMART STORE</h2>
+                    <p>IOT Retail Street</p>
+                    <p>Chh.Sambhaji Nagar MH 431001</p>
+                    <p>Phone: +91 8308822538</p>
+                </div>
+                <div className="border-b-2 border-dashed border-gray-400 my-2"></div>
+                <div className="flex justify-between">
+                    <span>Date: {data.date}</span>
+                </div>
+                <div>ID: {data.cartId}</div>
+                <div className="border-b-2 border-dashed border-gray-400 my-2"></div>
+                <table className="w-full text-left">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th className="text-center">Qty</th>
+                            <th className="text-right">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.items.map((item, i) => (
+                            <tr key={i}>
+                                <td>{item.name}</td>
+                                <td className="text-center">{item.qty}</td>
+                                <td className="text-right">₹{(item.price * item.qty).toFixed(2)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="border-b-2 border-dashed border-gray-400 my-2"></div>
+                <div className="flex justify-between font-bold text-lg">
+                    <span>TOTAL</span>
+                    <span>₹{data.total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs mt-1">
+                    <span>Payment: {data.method}</span>
+                </div>
+                <div className="border-b-2 border-dashed border-gray-400 my-2"></div>
+                <div className="text-center mt-4">
+                    <p>Thank you for shopping!</p>
+                    <p>Visit Again</p>
+                </div>
+            </div>
+        );
+    };
+
 
     if (!isAllowed) {
         return <div className="p-8 text-center text-red-600 font-bold">Access Denied.</div>;
@@ -41,11 +104,20 @@ export default function Cart() {
     const save = (newCart) => {
         localStorage.setItem("cart", JSON.stringify(newCart));
         setCart(newCart);
-        // Persist draft cart to server session (does not checkout)
         try {
             const getCookie = (name) => {
-                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-                return v ? v.pop() : '';
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
             };
             const csrf = getCookie('csrftoken');
 
@@ -60,15 +132,13 @@ export default function Cart() {
         }
     };
 
-    const inc = (id) => {
-        const copy = cart.map((c) => (c.id === id ? { ...c, qty: c.qty + 1 } : c));
-        save(copy);
-    };
-
-    const dec = (id) => {
-        const copy = cart
-            .map((c) => (c.id === id ? { ...c, qty: c.qty - 1 } : c))
-            .filter((c) => c.qty > 0);
+    const updateQty = (id, delta) => {
+        const copy = cart.map((c) => {
+            if (c.id === id) {
+                return { ...c, qty: Math.max(0, c.qty + delta) };
+            }
+            return c;
+        }).filter(c => c.qty > 0);
         save(copy);
     };
 
@@ -81,47 +151,37 @@ export default function Cart() {
 
     const initiateCheckout = () => {
         setError(null);
+        setPaymentSuccess(false);
         if (!cart.length) return setError('Cart is empty');
         setShowPaymentModal(true);
     };
 
     const processPaymentAndCheckout = async () => {
         setProcessingPayment(true);
+        // Simulate payment processing time
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Open window immediately to bypass popup blocker
-        let printWindow = null;
-        try {
-            printWindow = window.open('', '_blank');
-            if (printWindow) {
-                printWindow.document.write('<html><head><title>Processing</title></head><body><div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;"><h2>Processing Payment... Please wait. Do not close this window.</h2></div></body></html>');
-            }
-        } catch (e) {
-            console.error("Popup blocked", e);
-        }
-
-        // Simulate payment delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        await handleActualTransaction(printWindow);
+        await handleActualTransaction();
         setProcessingPayment(false);
-        setShowPaymentModal(false);
     };
 
-    const handleActualTransaction = async (printWindow) => {
+    const handleActualTransaction = async () => {
         setLoadingCheckout(true);
         try {
-            // verify session
-            const me = await fetch('/api/v1/me/', { credentials: 'include' });
-            if (!me.ok) {
-                setLoadingCheckout(false);
-                setError('You must be logged in to checkout');
-                if (printWindow) printWindow.close();
-                return;
-            }
-
             // Read CSRF token from cookie
             const getCookie = (name) => {
-                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-                return v ? v.pop() : '';
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
             };
             const csrf = getCookie('csrftoken');
 
@@ -135,305 +195,244 @@ export default function Cart() {
             if (res.ok) {
                 const resp = await res.json();
                 const cartId = resp.cart_id || resp.cart || 'N/A';
-                const now = new Date().toLocaleString();
 
-                // Build receipt HTML using local cart contents
-                const rows = cart.map((it) => `
-                                        <tr>
-                                                <td style="padding:8px;border:1px solid #ddd">${it.name}</td>
-                                                <td style="padding:8px;border:1px solid #ddd;text-align:center">${it.qty}</td>
-                                                <td style="padding:8px;border:1px solid #ddd;text-align:right">₹${it.price}</td>
-                                                <td style="padding:8px;border:1px solid #ddd;text-align:right">₹${(Number(it.price) || 0) * it.qty}</td>
-                                        </tr>
-                                `).join('');
+                // Prepare receipt data
+                const receipt = {
+                    date: new Date().toLocaleString(),
+                    cartId: cartId,
+                    items: [...cart],
+                    total: total,
+                    method: paymentMethod.toUpperCase()
+                };
+                setReceiptData(receipt);
+                setPaymentSuccess(true);
 
-                const totalAmount = cart.reduce((s, i) => s + (Number(i.price) || 0) * i.qty, 0);
-
-                const receiptHtml = `<!doctype html>
-                                <html>
-                                <head>
-                                    <meta charset="utf-8" />
-                                    <title>Transaction Receipt</title>
-                                    <style>
-                                        body{font-family: Arial, Helvetica, sans-serif; padding:20px}
-                                        .header{text-align:center;margin-bottom:20px}
-                                        table{border-collapse:collapse;width:100%}
-                                        @media print {
-                                            .no-print { display: none; }
-                                        }
-                                    </style>
-                                </head>
-                                <body>
-                                    <div class="header">
-                                        <h2>Store Receipt</h2>
-                                        <div>Transaction ID: ${cartId}</div>
-                                        <div>Date: ${now}</div>
-                                        <div>Payment Method: ${paymentMethod.toUpperCase()}</div>
-                                    </div>
-                                    <table>
-                                        <thead>
-                                            <tr>
-                                                <th style="padding:8px;border:1px solid #ddd;text-align:left">Item</th>
-                                                <th style="padding:8px;border:1px solid #ddd;text-align:center">Qty</th>
-                                                <th style="padding:8px;border:1px solid #ddd;text-align:right">Price</th>
-                                                <th style="padding:8px;border:1px solid #ddd;text-align:right">Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            ${rows}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <td colspan="3" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">Grand Total</td>
-                                                <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">₹${totalAmount}</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                    <script>
-                                        window.onload = function(){ 
-                                            setTimeout(function() {
-                                                window.print();
-                                                // Optional: window.close() after print if desired (browser dependent)
-                                            }, 500); 
-                                        };
-                                    </script>
-                                </body>
-                                </html>`;
-
-                if (printWindow) {
-                    printWindow.document.open();
-                    printWindow.document.write(receiptHtml);
-                    printWindow.document.close();
-                } else {
-                    // Try opening again (less likely to work if blocked before) or alert
-                    const w = window.open('', '_blank');
-                    if (w) {
-                        w.document.write(receiptHtml);
-                        w.document.close();
-                    } else {
-                        alert('Transaction saved successfully! Please enable popups to print receipt.');
-                    }
-                }
-
+                // Clear cart locally
                 localStorage.removeItem('cart');
                 setCart([]);
-                navigate('/dashboard');
+
             } else {
-                if (printWindow) printWindow.close();
                 const contentType = res.headers.get("content-type");
+                let errorMsg = "Transaction failed";
                 if (contentType && contentType.includes("application/json")) {
                     const data = await res.json();
-                    setError('Error: ' + (data.error || data.detail || 'Unable to save transaction'));
-                } else {
-                    setError(`Server Error: ${res.status} ${res.statusText}. Check backend routes.`);
+                    errorMsg = data.error || data.detail || errorMsg;
                 }
+                setError(errorMsg);
             }
         } catch (e) {
-            if (printWindow) printWindow.close();
             setError('Network error: ' + e.message);
         } finally {
             setLoadingCheckout(false);
         }
     };
 
-    return (
-        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-7xl mx-auto">
-                <h1 className="text-3xl font-extrabold text-gray-900 mb-8 flex items-center gap-3">
-                    <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                    Your Shopping Cart
-                </h1>
+    const handlePrintAndClose = () => {
+        window.print();
+        setShowPaymentModal(false);
+        setReceiptData(null); // Reset receipt
+        // Stay on cart page for next customer
+    };
 
+    return (
+        <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
+            {/* Header / Top Bar */}
+            <div className="bg-white shadow-sm sticky top-0 z-20 px-6 py-4 flex justify-between items-center print:hidden">
+                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    🛒 Self Checkout
+                </h1>
+                <div className="text-right">
+                    <p className="text-sm text-gray-500">Scan items to add to cart</p>
+                </div>
+            </div>
+
+            <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 print:hidden">
                 {cart.length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-                        <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                    <div className="flex flex-col items-center justify-center h-[60vh] text-center bg-white rounded-2xl shadow-sm p-8">
+                        <div className="w-32 h-32 bg-indigo-50 rounded-full flex items-center justify-center mb-6">
+                            <svg className="w-16 h-16 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
-                        <p className="text-gray-500 mb-8">It looks like you haven't added any items yet.</p>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">Ready to Scan</h2>
+                        <p className="text-gray-500 text-lg mb-8">Scan QR codes on items or use the manual entry.</p>
                         <button
                             onClick={() => navigate('/product')}
-                            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-medium shadow-lg hover:bg-indigo-700 transition transform hover:-translate-y-1"
                         >
-                            Start Shopping
+                            Browse Products
                         </button>
                     </div>
                 ) : (
-                    <div className="lg:grid lg:grid-cols-12 lg:gap-x-12 lg:items-start">
-                        {/* Cart Items List */}
-                        <section className="col-span-12 lg:col-span-7">
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                                <ul className="divide-y divide-gray-200">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+                        {/* Left: Cart Items */}
+                        <div className="lg:col-span-2 space-y-4">
+                            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                                <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                                    <h2 className="font-semibold text-gray-700">Current Order ({cart.length} items)</h2>
+                                    <button onClick={() => save([])} className="text-red-500 text-sm hover:underline">Clear All</button>
+                                </div>
+                                <div className="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
                                     {cart.map((item) => (
-                                        <li key={item.id} className="p-6 flex flex-col sm:flex-row sm:items-center gap-6 hover:bg-gray-50 transition-colors">
-                                            <div className="flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500 font-bold text-xl">
-                                                {item.name.substring(0, 2).toUpperCase()}
+                                        <div key={item.id} className="p-4 flex items-center gap-4 hover:bg-gray-50 transition">
+                                            <div className="w-16 h-16 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center text-xl font-bold text-gray-500">
+                                                {item.name.charAt(0)}
                                             </div>
-
-                                            <div className="flex-1 flex flex-col sm:flex-row sm:justify-between data-list">
-                                                <div className="pr-6">
-                                                    <h3 className="text-lg font-medium text-gray-900">
-                                                        {item.name}
-                                                    </h3>
-                                                    <p className="mt-1 text-sm text-gray-500">SKU: {item.sku}</p>
-                                                    <p className="mt-1 text-sm font-medium text-indigo-600">₹{item.price}</p>
-                                                </div>
-
-                                                <div className="mt-4 sm:mt-0 flex items-center justify-between sm:justify-end gap-6">
-                                                    <div className="flex items-center border border-gray-300 rounded-lg">
-                                                        <button
-                                                            onClick={() => dec(item.id)}
-                                                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-l-lg transition-colors"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path></svg>
-                                                        </button>
-                                                        <span className="px-4 py-1 text-sm font-semibold text-gray-900 border-x border-gray-300 min-w-[3rem] text-center">
-                                                            {item.qty}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => inc(item.id)}
-                                                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-r-lg transition-colors"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                                                        </button>
-                                                    </div>
-
-                                                    <button
-                                                        onClick={() => remove(item.id)}
-                                                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors"
-                                                        title="Remove item"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                                    </button>
-                                                </div>
+                                            <div className="flex-1">
+                                                <h3 className="font-bold text-gray-800 text-lg">{item.name}</h3>
+                                                <p className="text-sm text-gray-500">SKU: {item.sku}</p>
                                             </div>
-                                        </li>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                                                    <button onClick={() => updateQty(item.id, -1)} className="p-2 hover:bg-white rounded-md transition shadow-sm">-</button>
+                                                    <span className="w-8 text-center font-bold">{item.qty}</span>
+                                                    <button onClick={() => updateQty(item.id, 1)} className="p-2 hover:bg-white rounded-md transition shadow-sm">+</button>
+                                                </div>
+                                                <div className="text-right min-w-[80px]">
+                                                    <p className="font-bold text-lg text-indigo-600">₹{(item.price * item.qty).toFixed(2)}</p>
+                                                    <p className="text-xs text-gray-400">₹{item.price} each</p>
+                                                </div>
+                                                <button onClick={() => remove(item.id)} className="text-gray-400 hover:text-red-500 p-2">✕</button>
+                                            </div>
+                                        </div>
                                     ))}
-                                </ul>
+                                </div>
                             </div>
-                        </section>
+                        </div>
 
-                        {/* Order Summary */}
-                        <section className="col-span-12 lg:col-span-5 mt-8 lg:mt-0">
-                            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 lg:sticky lg:top-8">
-                                <h2 className="text-lg font-medium text-gray-900 mb-6 border-b pb-4">Order Summary</h2>
-
-                                <dl className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <dt className="text-sm text-gray-600">Subtotal ({cart.length} items)</dt>
-                                        <dd className="text-sm font-medium text-gray-900">₹{total.toFixed(2)}</dd>
+                        {/* Right: Summary & Checkout */}
+                        <div className="lg:col-span-1">
+                            <div className="bg-white rounded-2xl shadow-lg border border-indigo-50 p-6 sticky top-24">
+                                <h2 className="text-xl font-bold text-gray-800 mb-6">Order Summary</h2>
+                                <div className="space-y-3 mb-6">
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Subtotal</span>
+                                        <span>₹{total.toFixed(2)}</span>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <dt className="text-sm text-gray-600">Shipping Estimate</dt>
-                                        <dd className="text-sm font-medium text-green-600">Free</dd>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Tax (0%)</span>
+                                        <span>₹0.00</span>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <dt className="text-sm text-gray-600">Tax Estimate</dt>
-                                        <dd className="text-sm font-medium text-gray-900">Included</dd>
+                                    <div className="border-t border-dashed border-gray-200 my-2"></div>
+                                    <div className="flex justify-between text-2xl font-bold text-gray-900">
+                                        <span>Total</span>
+                                        <span>₹{total.toFixed(2)}</span>
                                     </div>
-
-                                    <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
-                                        <dt className="text-base font-bold text-gray-900">Order Total</dt>
-                                        <dd className="text-2xl font-bold text-indigo-600">₹{total.toFixed(2)}</dd>
-                                    </div>
-                                </dl>
+                                </div>
 
                                 {error && (
-                                    <div className="mt-4 p-4 rounded-lg bg-red-50 text-red-700 text-sm flex items-start gap-2">
-                                        <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
                                         {error}
                                     </div>
                                 )}
 
-                                <div className="mt-6">
-                                    <button
-                                        onClick={initiateCheckout}
-                                        disabled={loadingCheckout}
-                                        className="w-full bg-indigo-600 border border-transparent rounded-xl shadow-md py-4 px-4 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-95"
-                                    >
-                                        {loadingCheckout ? (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                                Processing...
-                                            </span>
-                                        ) : 'Proceed to Checkout'}
-                                    </button>
-                                    <p className="mt-4 text-center text-xs text-gray-500 flex items-center justify-center gap-1">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                                        Secure Checkout
-                                    </p>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-                )}
-            </div>
-
-            {/* Payment Modal */}
-            {showPaymentModal && (
-                <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    {/* Background overlay */}
-                    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowPaymentModal(false)}></div>
-
-                    {/* Modal positioning */}
-                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
-                        {/* Modal panel */}
-                        <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <div className="sm:flex sm:items-start">
-                                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
-                                        <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                                    </div>
-                                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                                        <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">Payment Details</h3>
-                                        <div className="mt-4 space-y-4">
-                                            <div className="bg-gray-50 p-4 rounded-lg flex justify-between items-center">
-                                                <span className="text-sm font-medium text-gray-500">Total Amount</span>
-                                                <span className="text-2xl font-bold text-gray-900">₹{total.toFixed(2)}</span>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Select Payment Method</label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button
-                                                        onClick={() => setPaymentMethod('cash')}
-                                                        className={`flex flex-col items-center justify-center p-3 border-2 rounded-xl transition-all ${paymentMethod === 'cash' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300'}`}
-                                                    >
-                                                        <span className="text-2xl mb-1">💵</span>
-                                                        <span className="text-sm font-medium">Cash</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setPaymentMethod('card')}
-                                                        className={`flex flex-col items-center justify-center p-3 border-2 rounded-xl transition-all ${paymentMethod === 'card' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300'}`}
-                                                    >
-                                                        <span className="text-2xl mb-1">💳</span>
-                                                        <span className="text-sm font-medium">Card / UPI</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                                 <button
-                                    type="button"
-                                    onClick={processPaymentAndCheckout}
-                                    disabled={processingPayment}
-                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                                    onClick={initiateCheckout}
+                                    className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 active:scale-95 transition flex items-center justify-center gap-2"
                                 >
-                                    {processingPayment ? 'Processing...' : 'Pay & Print Receipt'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPaymentModal(false)}
-                                    disabled={processingPayment}
-                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                                >
-                                    Cancel
+                                    Proceed to Pay ₹{total.toFixed(2)}
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                                 </button>
                             </div>
                         </div>
+                    </div>
+                )}
+            </main>
+
+            {/* Hidden Receipt Component - ONLY Visible when Printing */}
+            <Receipt data={receiptData} />
+
+
+            {/* Payment Modal */}
+            {showPaymentModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity print:hidden">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+
+                        {!paymentSuccess ? (
+                            <>
+                                <div className="bg-indigo-600 p-6 text-white text-center">
+                                    <h3 className="text-2xl font-bold">Checkout</h3>
+                                    <p className="opacity-80">Complete your purchase</p>
+                                </div>
+                                <div className="p-6">
+                                    <div className="text-center mb-6">
+                                        <p className="text-gray-500 text-sm uppercase tracking-wide">Amount Due</p>
+                                        <p className="text-4xl font-bold text-gray-900">₹{total.toFixed(2)}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <button
+                                            onClick={() => setPaymentMethod('cash')}
+                                            className={`p-4 border-2 rounded-xl flex flex-col items-center gap-2 transition ${paymentMethod === 'cash' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-100 hover:border-gray-200'}`}
+                                        >
+                                            <span className="text-2xl">💵</span>
+                                            <span className="font-semibold">Cash</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setPaymentMethod('upi')}
+                                            className={`p-4 border-2 rounded-xl flex flex-col items-center gap-2 transition ${paymentMethod === 'upi' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-100 hover:border-gray-200'}`}
+                                        >
+                                            <span className="text-2xl">📱</span>
+                                            <span className="font-semibold">UPI / QR</span>
+                                        </button>
+                                    </div>
+
+                                    {paymentMethod === 'upi' && (
+                                        <div className="bg-gray-100 p-4 rounded-lg mb-6 flex items-center justify-center">
+                                            {/* Simulated QR Code */}
+                                            <div className="w-32 h-32 bg-white p-2">
+                                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=store@upi&pn=SmartStore" alt="Pay QR" />
+                                            </div>
+                                            <div className="ml-4 text-left">
+                                                <p className="font-bold text-gray-800">Scan to Pay</p>
+                                                <p className="text-xs text-gray-500">Use any UPI app</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {error && (
+                                        <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm text-center">
+                                            {error}
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setShowPaymentModal(false)}
+                                            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-50"
+                                            disabled={processingPayment}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={processPaymentAndCheckout}
+                                            disabled={processingPayment}
+                                            className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold shadow-md hover:bg-green-700 disabled:opacity-70 flex items-center justify-center gap-2"
+                                        >
+                                            {processingPayment ? (
+                                                <>Processing...</>
+                                            ) : (
+                                                <>Pay Now</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="p-8 text-center">
+                                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                                    <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                                </div>
+                                <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
+                                <p className="text-gray-500 mb-6">Your transaction has been recorded.</p>
+                                <button
+                                    onClick={handlePrintAndClose}
+                                    className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                    Print Receipt & Finish
+                                </button>
+                            </div>
+                        )}
+
                     </div>
                 </div>
             )}

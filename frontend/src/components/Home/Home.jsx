@@ -14,7 +14,7 @@ export default function Home() {
                         Smart Shopping Reimagined
                     </h1>
                     <p className="mt-6 text-lg leading-8 text-gray-600 max-w-2xl mx-auto">
-                        Experience the future of retail with our IoT-enabled self-billing system. Effortless shopping—just scan, pay, and go.
+                        Experience the future of retail with our IoT-enabled self-billing system. Effortless shopping just scan, pay, and go.
                     </p>
                     <div className="mt-10 flex items-center justify-center gap-x-6">
                         {user ? (

@@ -189,6 +189,10 @@ class TransactionCreateView(APIView):
 
         try:
             with db_transaction.atomic():
+                # For history keeping (Order), we create a *new* Cart record
+                # But we must also CLEAR the active "IoT/Kiosk" cart
+                
+                # 1. Create the permanent order record
                 cart = Cart.objects.create(user=request.user)
                 created_items = []
                 
@@ -196,11 +200,9 @@ class TransactionCreateView(APIView):
                     pid = item.get("id") or item.get("product")
                     qty = int(item.get("qty", 1))
                     
-                    # Excellent use of select_for_update()!
                     product = Product.objects.select_for_update().get(pk=pid)
                     
                     if product.stock < qty:
-                        # Rollback is automatic when an exception is raised inside atomic()
                         raise ValueError(f"Insufficient stock for {product.name}. Only {product.stock} left.")
                     
                     Transaction.objects.create(cart=cart, product=product, quantity=qty)
@@ -209,7 +211,17 @@ class TransactionCreateView(APIView):
                     
                     created_items.append({"product": product.id, "qty": qty})
 
-            # Clear the session cart after a successful transaction
+            # 2. CLEAR the Shared IoT Cart!
+            store_user = get_store_user()
+            if store_user:
+                # Find the active cart used by scanner
+                active_cart = Cart.objects.filter(user=store_user).order_by('-created_at').first()
+                if active_cart:
+                    # Clear items or delete cart. Deleting cart is cleaner for "new session"
+                    # active_cart.transaction_set.all().delete() 
+                    active_cart.delete()
+
+            # Clear the session cart (legacy/fallback)
             if 'cart' in request.session:
                 del request.session['cart']
 
@@ -232,3 +244,161 @@ class OrderHistoryView(ListAPIView):
         return Cart.objects.filter(user=self.request.user).prefetch_related(
             "transaction_set", "transaction_set__product"
         ).order_by("-created_at")
+
+# ============================
+# IoT Scan API Views
+# ============================
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ScanProductView(View):
+    def post(self, request, *args, **kwargs):
+        try:
+            # Use specific store user (Admin) for IoT cart
+            user = get_store_user()
+            if not user:
+                 return JsonResponse({'error': 'No store user found'}, status=500)
+            
+            if not request.body:
+                return JsonResponse({'error': 'Empty body'}, status=400)
+            
+            data = json.loads(request.body)
+            sku = data.get('sku')
+            
+            if not sku:
+                return JsonResponse({'error': 'SKU is required'}, status=400)
+
+            try:
+                product = Product.objects.get(sku=sku)
+            except Product.DoesNotExist:
+                return JsonResponse({'message': 'Product not found'}, status=404)
+
+            # --- DB Cart Logic ---
+            # Use authenticated user or default to first user (Admin/Store)
+            # user = request.user if request.user.is_authenticated else get_user_model().objects.first()
+            # if not user:
+            #      return JsonResponse({'error': 'No user found for cart association'}, status=500)
+
+            # Find latest cart created recently (e.g., last 24h) or create new
+            cart = Cart.objects.filter(user=user).order_by('-created_at').first()
+            
+            # Create new cart if none exists or if it's too old (e.g. > 1 day)
+            if not cart or (timezone.now() - cart.created_at > timedelta(days=1)):
+                cart = Cart.objects.create(user=user)
+
+            # Check if product already in cart (Transaction)
+            transaction_item = Transaction.objects.filter(cart=cart, product=product).first()
+            
+            if transaction_item:
+                transaction_item.quantity += 1
+                transaction_item.save()
+                
+                # Check stock (optional based on requirements)
+                # if product.stock < transaction_item.quantity: ...
+            else:
+                Transaction.objects.create(cart=cart, product=product, quantity=1)
+
+            # Calculate totals from DB
+            cart_items = Transaction.objects.filter(cart=cart)
+            cart_count = sum(item.quantity for item in cart_items)
+            cart_total = sum(item.product.price * item.quantity for item in cart_items)
+
+            return JsonResponse({
+                'status': 'added',
+                'product': {
+                    'name': product.name,
+                    'price': float(product.price)
+                },
+                'cart_count': cart_count,
+                'cart_total': cart_total
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CartAPIView(View):
+    def get(self, request, *args, **kwargs):
+        # Use specific store user (Admin) so frontend sees same cart as scanner
+        user = get_store_user()
+        if not user:
+             return JsonResponse({'cart': [], 'cart_count': 0, 'cart_total': 0})
+
+        cart = Cart.objects.filter(user=user).order_by('-created_at').first()
+        
+        if not cart:
+            return JsonResponse({
+                'cart': [],
+                'cart_count': 0,
+                'cart_total': 0
+            })
+
+        cart_items = Transaction.objects.filter(cart=cart).select_related('product')
+        
+        items_data = []
+        cart_count = 0
+        cart_total = 0
+        
+        for item in cart_items:
+            items_data.append({
+                'id': item.product.id,
+                'sku': item.product.sku,
+                'name': item.product.name,
+                'price': float(item.product.price),
+                'qty': item.quantity
+            })
+            cart_count += item.quantity
+            cart_total += item.product.price * item.quantity
+        
+        return JsonResponse({
+            'cart': items_data,
+            'cart_count': cart_count,
+            'cart_total': cart_total
+        })
+
+
+    def post(self, request, *args, **kwargs):
+        # Sync frontend cart state to DB
+        try:
+            # Sync to the shared Store Cart
+            user = get_store_user()
+            if not user:
+                 return JsonResponse({'error': 'User not found'}, status=500)
+            
+            data = json.loads(request.body)
+            items = data.get('items', [])
+            
+            cart = Cart.objects.filter(user=user).order_by('-created_at').first()
+            if not cart:
+                cart = Cart.objects.create(user=user)
+            
+            # Clear existing items and rebuild (simple sync)
+            cart.transaction_set.all().delete()
+            
+            for item in items:
+                sku = item.get('sku')
+                qty = item.get('qty', 1)
+                if sku:
+                    try:
+                        product = Product.objects.get(sku=sku)
+                        Transaction.objects.create(cart=cart, product=product, quantity=qty)
+                    except Product.DoesNotExist:
+                        pass
+            
+            return JsonResponse({'status': 'synced'})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+def get_store_user():
+    """Helper to get the central store user (Admin) for shared IoT cart operations"""
+    User = get_user_model()
+    # Prefer a superuser as the store owner/system account
+    user = User.objects.filter(is_superuser=True).first()
+    if not user:
+        user = User.objects.first()
+    return user
+

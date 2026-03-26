@@ -23,7 +23,7 @@ export default function Header({ user, setUser, loading }) {
     };
 
     return (
-        <header className="shadow sticky z-50 top-0 bg-white">
+        <header className="shadow sticky z-50 top-0 bg-white print:hidden">
             <nav className="border-gray-200 px-4 lg:px-6 py-2.5">
                 <div className="flex flex-wrap justify-between items-center mx-auto max-w-screen-xl">
 
@@ -107,13 +107,13 @@ export default function Header({ user, setUser, loading }) {
 
                                     {(user.isAdmin || user.role?.toLowerCase() === "store manager" || user.role?.toLowerCase() === "admin" || user.role?.toLowerCase() === "staff member") && (
                                         <>
-                                            <li>
+                                            {/* <li>
                                                 <NavLink to="/scan" className={({ isActive }) =>
                                                     `block py-2 pr-4 pl-3 duration-200 ${isActive ? "text-orange-700 font-bold" : "text-gray-700"} hover:text-orange-700 lg:p-0`
                                                 }>
                                                     Scan
                                                 </NavLink>
-                                            </li>
+                                            </li> */}
 
                                             <li>
                                                 <NavLink to="/cart" className={({ isActive }) =>

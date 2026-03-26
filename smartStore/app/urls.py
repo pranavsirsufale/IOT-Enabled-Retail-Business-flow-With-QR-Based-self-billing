@@ -14,6 +14,8 @@ from .views import (
     current_user,
     logout_view,
     OrderHistoryView,
+    ScanProductView,
+    CartAPIView,
 )
 router = DefaultRouter()
 
@@ -31,7 +33,9 @@ urlpatterns = [
     path("me/", current_user, name="current-user"),
     
     # Cart & Transaction Endpoints
-    path("cart/", CartDraftView.as_view(), name="cart-draft"), 
+    # path("cart/", CartDraftView.as_view(), name="cart-draft"),
+    path("cart/", CartAPIView.as_view(), name="cart-api"), 
+    path("scan/", ScanProductView.as_view(), name="scan-product"),
     path("transactions/", TransactionCreateView.as_view(), name="transaction-create"),
     path("orders/", OrderHistoryView.as_view(), name="order-history"),
 

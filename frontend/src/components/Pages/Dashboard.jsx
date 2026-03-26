@@ -37,19 +37,32 @@ export default function Dashboard() {
       color: "bg-green-50",
     },
     {
-      title: "Scan & Bill",
-      description: "Process customer purchases using the QR scanner.",
+      title: "Cart & Billing",
+      description: "Register new items into the system with QR code generation.",
       icon: (
-        <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4c1 0 2 1 2 2v6W8 19.86l7.1-7.1a1 1 0 011.4 0l.01.01a1 1 0 010 1.41L12.8 18l1.6 3.9L20 6H6" />
-          {/* Using a simpler scan icon conceptualization for reliability or just a generic search/scan icon */}
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
       ),
-      path: "/scan",
+      path: "/cart",
+
       allowed: isStoreManagerOrAdmin || isStaffMember,
-      color: "bg-purple-50",
+      color: "bg-purple-50"
     },
+    // {
+    //   title: "Scan & Bill",
+    //   description: "Process customer purchases using the QR scanner.",
+    //   icon: (
+    //     <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4c1 0 2 1 2 2v6W8 19.86l7.1-7.1a1 1 0 011.4 0l.01.01a1 1 0 010 1.41L12.8 18l1.6 3.9L20 6H6" />
+    //       {/* Using a simpler scan icon conceptualization for reliability or just a generic search/scan icon */}
+    //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+    //     </svg>
+    //   ),
+    //   path: "/scan",
+    //   allowed: isStoreManagerOrAdmin || isStaffMember,
+    //   color: "bg-purple-50",
+    // },
     {
       title: "Category Manager",
       description: "Organize products into categories and sub-categories.",
