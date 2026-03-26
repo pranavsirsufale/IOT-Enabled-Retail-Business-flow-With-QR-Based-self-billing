@@ -40,8 +40,36 @@ export default function Cart() {
         };
 
         fetchCart();
-        const interval = setInterval(fetchCart, 1000);
-        return () => clearInterval(interval);
+
+        // Connect to WebSocket for instant updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Connect directly to the port where Django Daphne is running (8000), not the Vite dev server (5173/etc)
+        // If the frontend and backend are hosted on the same domain, then use window.location.host
+        const wsUrl = process.env.NODE_ENV === 'development'
+            ? `ws://localhost:8000/ws/cart/`
+            : `${protocol}//${window.location.host}/ws/cart/`;
+
+        const ws = new WebSocket(wsUrl);
+
+        ws.onmessage = function (event) {
+            try {
+                const wsData = JSON.parse(event.data);
+                if (wsData.action === 'update') {
+                    // Re-fetch the cart when notified by websocket
+                    fetchCart();
+                }
+            } catch (err) {
+                console.error("Error parsing websocket message", err);
+            }
+        };
+
+        ws.onclose = function (event) {
+            console.log('Cart WebSocket disconnected.');
+        };
+
+        return () => {
+            if (ws) ws.close();
+        };
     }, [isAllowed]);
 
     // Receipt Component for Printing

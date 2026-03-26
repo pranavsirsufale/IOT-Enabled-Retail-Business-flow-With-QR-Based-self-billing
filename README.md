@@ -1,73 +1,57 @@
 # IoT-Enabled Retail Business Flow With QR-Based Self-Billing
 
 ![Project](https://img.shields.io/badge/Project-IoT%20Smart%20Store-blue)
-![Backend](https://img.shields.io/badge/Backend-Django-green)
+![Backend](https://img.shields.io/badge/Backend-Django_Channels-green)
 ![Frontend](https://img.shields.io/badge/Frontend-React-blue)
-![Database](https://img.shields.io/badge/Database-PostgreSQL-orange)
-![License](https://img.shields.io/badge/License-Academic-lightgrey)
+![Computer Vision](https://img.shields.io/badge/IoT_Scanner-OpenCV_%2B_PyZbar-orange)
 
 ---
-This project is a modern, IoT-based Smart Retail Billing System designed to streamline the in-store shopping experience. It allows customers to scan product QR codes using a web application, manage a digital cart, and complete a self-checkout process, effectively eliminating the need to wait in long billing queues.
+This project is a modern, IoT-based Smart Retail Billing System designed to streamline the in-store shopping experience. It features a standalone hardware-emulating IoT scanner script that instantly recognizes 1D barcodes and 2D QR codes via computer vision, pushing real-time updates through WebSockets to a React frontend.
 
-The system integrates a React frontend with a Django backend to provide a seamless flow from product scanning to final payment and receipt generation.
+The system integrates a React frontend, an asynchronous Django Channels backend, and a Python-based IoT scanning module to provide a fast, seamless flow from product scanning to final payment.
 
 ## Key Features
 
-*   **QR Code Product Scanning:** Add items to a digital cart by scanning their unique QR codes.
-*   **Smart Cart Management:** View, update quantities, and remove items from the cart in real-time.
+*   **Hardware IoT Scanning:** Uses OpenCV and `pyzbar` to capture and decode high-resolution images mapping both 1D Barcodes and 2D QR codes using advanced binary thresholding.
+*   **Real-Time WebSocket Updates:** Replaces slow HTTP polling with Django Channels and WebSockets. As soon as an item is scanned, the backend pushes an update directly to the React frontend cart.
+*   **Smart Cart Management:** View, update quantities, and remove items from the cart instantly in real-time.
 *   **Self-Checkout System:** Process transactions and generate a bill without cashier assistance.
-*   **Digital Receipt Generation:** A printable receipt is generated upon successful payment.
 *   **Role-Based Access Control:** Differentiated access for Admins, Store Managers, and Staff Members.
 *   **Product & Inventory Management:** A comprehensive interface for administrators to add, edit, and manage products and categories.
-*   **Staff Management:** Admins can create and manage staff accounts and their roles.
 
 ## Technology Stack
 
 | Component | Technology                                          |
 | :-------- | :-------------------------------------------------- |
-| **Frontend**  | React, Vite, Tailwind CSS                           |
-| **Backend**   | Django, Django REST Framework                     |
-| **Database**  | MySQL (Configured), PostgreSQL (Option), SQLite (Dev)     |
-| **Authentication** | Django Sessions, CSRF Protection                |
-| **IoT**       | Browser-based QR/Barcode Scanner (`html5-qrcode`) |
+| **Frontend**  | React, Vite, Tailwind CSS, WebSockets               |
+| **Backend**   | Django, Django REST Framework, Django Channels, Daphne |
+| **Database**  | MySQL / SQLite (Development)                        |
+| **IoT Scanner** | Python, OpenCV (`cv2`), `pyzbar`, Webcams         |
 
 ## System Architecture
 
-The application is built on a client-server architecture:
+The application operates using an event-driven architecture, enabling cross-device communication between the hardware scanner and the cashier/user interface.
 
-1.  **Frontend (React):** A single-page application built with React and Vite. It provides the user interface for customers and staff to interact with the system. It communicates with the backend via a REST API. The `vite.config.js` is configured to proxy `/api` requests to the Django backend server during development.
+1.  **Hardware Scanner (`test.py` or `scanner.py`):** Acts as the IoT endpoint. It operates a high-resolution (1280x720) loop on an attached camera, hunting for known barcodes/QRs. Upon a successful decode, it posts to the backend `ScanProductView`.
+2.  **Backend (Django Channels):** Using an ASGI server (`daphne`), Django processes the scan payload, updates the database cart, and immediately uses `async_to_sync` to broadcast an update signal down the `cart_updates` layer.
+3.  **Frontend (React):** Connects to `ws://localhost:8000/ws/cart/`. As soon as it catches the payload `{"action": "update"}`, it queries the latest cart data efficiently. 
 
-2.  **Backend (Django):** A RESTful API built with Django and the Django REST Framework. It handles business logic, user authentication, database interactions, and serving product data.
+## API Endpoints & WebSockets
 
-3.  **Database:** Manages all persistent data, including users, staff roles, products, categories, and transaction history. The system is configured to work with MySQL.
+### WebSockets
+*   `ws/cart/` : The channel users connect to for live cart state updates.
 
-## API Endpoints
-
-The core functionalities are exposed through the following REST API endpoints, managed by Django REST Framework's `DefaultRouter`.
-
+### REST API
 | Endpoint                    | Method | Description                                                |
 | --------------------------- | ------ | ---------------------------------------------------------- |
+| `/api/v1/scan/`             | POST   | IoT Hardware target URL for registering scanned barcodes.  |
 | `/api/v1/login/`            | POST   | Authenticate a user and create a session.                  |
 | `/api/v1/logout/`           | POST   | Log the current user out.                                  |
-| `/api/v1/me/`               | GET    | Get details of the currently authenticated user.           |
+| `/api/v1/cart/`             | GET/POST| Retrieve or save a shopping cart for the user session.    |
 | `/api/v1/product/`          | GET/POST| List all products or create a new one.                     |
-| `/api/v1/product/<id>/`     | GET/PUT/DELETE | Retrieve, update, or delete a specific product.          |
-| `/api/v1/product/<id>/qr/`  | GET    | Generate and return a QR code image for a product's SKU.   |
-| `/api/v1/category/`         | GET/POST| List all categories or create a new one.                   |
-| `/api/v1/sub-category/`     | GET/POST| List all sub-categories or create a new one.               |
-| `/api/v1/staff/`            | GET/POST| List all staff members or create a new one.                |
-| `/api/v1/staff-types/`      | GET/POST| List all staff roles or create a new one.                  |
-| `/api/v1/cart/`             | GET/POST| Retrieve or save a draft shopping cart to the user's session. |
 | `/api/v1/transactions/`     | POST   | Finalize the cart, create a transaction, and update stock. |
-| `/api/v1/orders/`           | GET    | Retrieve the order history for the authenticated user.     |
 
-## Roles and Permissions
-
-The system defines several user roles with distinct permissions to ensure secure access to its features:
-
-*   **Admin:** Has full access to all features, including product management, category management, and staff management.
-*   **Store Manager:** Can manage products, categories, and process transactions but cannot manage staff accounts.
-*   **Staff Member:** Has read-only access to products and can use the scanning and checkout features for customers.
+*(Many other standard endpoints exist for administrative CRUD operations).*
 
 ## Getting Started
 
@@ -75,52 +59,41 @@ To run this project locally, follow the steps below.
 
 ### Prerequisites
 
-*   Python 3.8+
+*   Python 3.8+ (including python3-opencv libraries)
 *   Node.js 20.x or higher
-*   A running MySQL server instance.
+*   A connected Webcam (for the IoT scanner script).
 
-### Backend Setup
+### Backend Setup (ASGI/Daphne)
 
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/pranavsirsufale/IOT-Enabled-Retail-Business-flow-With-QR-Based-self-billing.git
-    cd IOT-Enabled-Retail-Business-flow-With-QR-Based-self-billing/smartStore
+    cd IOT-Enabled-Retail-Business-flow-With-QR-Based-self-billing
     ```
 
-2.  **Create a virtual environment and install dependencies:**
+2.  **Enter the virtual environment framework and install dependencies:**
+    *(Assuming your environment relies on the included `sys` python environment)*
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    pip install -r requirements.txt
+    ./sys/bin/pip install -r smartStore/requirements.txt
     ```
 
-3.  **Configure the database:**
-    Open `smartStore/smartStore/settings.py` and update the `DATABASES` dictionary with your MySQL credentials.
-    ```python
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': "your_db_name",
-            "USER": "your_db_user",
-            "PASSWORD": "your_db_password",
-            "HOST": "localhost",
-            "PORT": "3306"
-        }
-    }
-    ```
-
-4.  **Apply migrations and run the server:**
+3.  **Apply migrations:**
     ```bash
-    python manage.py migrate
-    python manage.py runserver
+    ./sys/bin/python smartStore/manage.py migrate
     ```
-    The backend will be running at `http://localhost:8000`.
+
+4.  **Run the ASGI server (Daphne):**
+    Because we utilize WebSockets, we use an ASGI server instead of standard `runserver`.
+    ```bash
+    cd smartStore
+    daphne -b 127.0.0.1 -p 8000 smartStore.asgi:application
+    ```
+    *(Alternatively, standard `manage.py runserver` works if Daphne is in `INSTALLED_APPS`)* 
 
 ### Frontend Setup
 
-1.  **Navigate to the frontend directory and install dependencies:**
+1.  **Install dependencies:**
     ```bash
-    # From the root project directory
     cd frontend
     npm install
     ```
@@ -129,14 +102,21 @@ To run this project locally, follow the steps below.
     ```bash
     npm run dev
     ```
-    The frontend application will be available at `http://localhost:5173`. It is pre-configured to proxy API requests to the backend.
+    The application will be available at `http://localhost:5173`. 
+
+### Hardware Scanner Setup
+
+Once your Django server is running securely on port 8000, start the camera script in an entirely separate terminal window.
+
+1.  **Run the vision script:**
+    ```bash
+    ./sys/bin/python test.py
+    ```
+2.  Hold up a barcode or QR code to your webcam. As soon as the green bounding box appears, the item is pushed over the network into your live React Cart session!
 
 ## Project Flow
-
-1.  **Login:** A staff member or admin logs into the system.
-2.  **Dashboard:** The user is presented with a dashboard of available actions based on their role.
-3.  **Product Management:** Admins can add, view, and edit products and their categories. A unique QR code is generated for each product SKU.
-4.  **Scanning:** The user navigates to the "Scan & Bill" page to activate the camera.
-5.  **Cart Building:** As product QR codes are scanned, the items are automatically identified and added to the digital cart.
-6.  **Checkout:** The user proceeds to the cart to review the items and initiates the checkout process.
-7.  **Payment and Receipt:** A payment method is selected, the transaction is finalized, and a printable digital receipt is generated. Product stock is updated automatically.
+1.  **Login:** A customer or staff logs into the system on the React interface.
+2.  **Activate Cart:** Users navigate to their Shopping Cart page, which initializes the WebSocket connection.
+3.  **Physical Scanning:** The hardware webcam picks up on a product. You will see a `POST 200 OK` in your Terminal.
+4.  **Real-time Update:** The browser receives the `cart_update` broadcast hook and refreshes the cart instantly, rendering the new item with its pricing logic applied.
+5.  **Checkout:** The user finishes their transaction via the web interface to print a digital receipt.

@@ -1,6 +1,9 @@
 import json
 from io import BytesIO
 
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 import qrcode
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -305,6 +308,16 @@ class ScanProductView(View):
             cart_count = sum(item.quantity for item in cart_items)
             cart_total = sum(item.product.price * item.quantity for item in cart_items)
 
+            # Notify Websocket about the cart update
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'cart_updates',
+                {
+                    'type': 'cart_message',
+                    'message': {'action': 'update'}
+                }
+            )
+
             return JsonResponse({
                 'status': 'added',
                 'product': {
@@ -389,6 +402,16 @@ class CartAPIView(View):
                     except Product.DoesNotExist:
                         pass
             
+            # Notify Websocket about the cart update
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                'cart_updates',
+                {
+                    'type': 'cart_message',
+                    'message': {'action': 'update'}
+                }
+            )
+
             return JsonResponse({'status': 'synced'})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)

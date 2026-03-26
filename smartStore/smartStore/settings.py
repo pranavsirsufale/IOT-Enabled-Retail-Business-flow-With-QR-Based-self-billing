@@ -3,7 +3,7 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-j_q!!85)+pa^rbb=f%cmq9$-&!($ig&ks=n#(bdqr=38my!60c'
 DEBUG = True
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1","10.241.23.100"]
 
 # Allow the frontend dev server origin for CORS and CSRF
 CORS_ALLOW_CREDENTIALS = True
@@ -18,6 +18,8 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -59,7 +61,16 @@ TEMPLATES = [
         },
     },
 ]
+
 WSGI_APPLICATION = 'smartStore.wsgi.application'
+ASGI_APPLICATION = 'smartStore.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
+
 # DATABASES = {
 #     'default': dj_database_url.parse(
 #         "postgresql://store_su5t_user:ZJ4cOwIRGY0wbJPfsxxhGMqJEann7ZCe@dpg-d6cot0pr0fns739d68ng-a.oregon-postgres.render.com/store_su5t"
