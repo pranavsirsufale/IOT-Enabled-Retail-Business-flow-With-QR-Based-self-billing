@@ -85,8 +85,16 @@ export default function Cart() {
     // Receipt Component for Printing
     const Receipt = ({ data }) => {
         if (!data) return null;
+
+        const items = Array.isArray(data.items) ? data.items : [];
+
         return (
-            <div id="printable-receipt" className="hidden print:block p-4 font-mono text-sm w-[300px]">
+            <div
+                id="printable-receipt"
+                className="p-4 font-mono text-sm w-[300px]"
+                // Keep mounted for printing, but hide off-screen during normal view.
+                style={{ position: "fixed", left: "-10000px", top: 0 }}
+            >
                 <div className="text-center mb-4">
                     <h2 className="text-xl font-bold">SMART STORE</h2>
                     <p>IOT Retail Street</p>
@@ -108,13 +116,31 @@ export default function Cart() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data.items.map((item, i) => (
-                            <tr key={i}>
-                                <td>{item.name}</td>
-                                <td className="text-center">{item.qty}</td>
-                                <td className="text-right">₹{(item.price * item.qty).toFixed(2)}</td>
+                        {items.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} className="text-center text-gray-500 py-2">
+                                    No items
+                                </td>
                             </tr>
-                        ))}
+                        ) : (
+                            items.map((item, i) => {
+                                const qty = Number(item?.qty ?? item?.quantity ?? item?.count ?? 1);
+                                const price = Number(item?.price ?? item?.unit_price ?? item?.selling_price ?? 0);
+                                const name = String(item?.name ?? item?.product_name ?? "Item");
+                                const lineTotal = Number.isFinite(qty * price) ? qty * price : 0;
+
+                                return (
+                                    <tr key={i}>
+                                        <td>
+                                            {name}
+                                            {item?.sku ? <span className="text-xs text-gray-500"> ({item.sku})</span> : null}
+                                        </td>
+                                        <td className="text-center">{Number.isFinite(qty) ? qty : 1}</td>
+                                        <td className="text-right">₹{lineTotal.toFixed(2)}</td>
+                                    </tr>
+                                );
+                            })
+                        )}
                     </tbody>
                 </table>
                 <div className="border-b-2 border-dashed border-gray-400 my-2"></div>
@@ -233,9 +259,11 @@ export default function Cart() {
     const handlePrintAndClose = () => {
         if (!receiptData || isPrinting) return;
         setIsPrinting(true);
+        // Call print synchronously from the user gesture for maximum browser compatibility.
+        window.print();
     };
 
-    // Print flow: ensure receipt stays mounted/visible for print preview.
+    // Cleanup AFTER the print dialog closes.
     useEffect(() => {
         if (!isPrinting) return;
 
@@ -249,14 +277,8 @@ export default function Cart() {
 
         window.addEventListener("afterprint", onAfterPrint);
 
-        // Let React commit DOM updates before opening the print dialog.
-        const rafId = window.requestAnimationFrame(() => {
-            window.print();
-        });
-
         return () => {
             window.removeEventListener("afterprint", onAfterPrint);
-            window.cancelAnimationFrame(rafId);
         };
     }, [isPrinting]);
 
