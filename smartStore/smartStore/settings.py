@@ -4,18 +4,20 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-j_q!!85)+pa^rbb=f%cmq9$-&!($ig&ks=n#(bdqr=38my!60c'
 DEBUG = True
-ALLOWED_HOSTS = ["localhost", "127.0.0.1","10.241.23.100"]
+ALLOWED_HOSTS = ["localhost","iot-v52t.onrender.com", "127.0.0.1","10.241.23.100"]
 
 # Allow the frontend dev server origin for CORS and CSRF
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173"
-]
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "https://iot-enabled-retail-business-flow-wi.vercel.app"
+]
 # Required for Django's CSRF origin checking when frontend runs on a separate origin
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "https://iot-enabled-retail-business-flow-wi.vercel.app"
 ]
 
 INSTALLED_APPS = [
