@@ -1,54 +1,63 @@
-import { useState, useEffect } from "react";
-import { useOutletContext, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import { apiUrl } from "../../api";
+
+const ACCESS_TOKEN_KEY = "accessToken";
+
+async function safeJson(res) {
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) return null;
+    try {
+        return await res.json();
+    } catch {
+        return null;
+    }
+}
 
 export default function Login() {
     const navigate = useNavigate();
-    const { setUser } = useOutletContext() || {};
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        // Double check but the context check is better
-        fetch(apiUrl("/api/v1/me/"), { credentials: "include" })
-            .then((res) => {
-                if (res.ok && !res.redirected && res.headers.get("content-type")?.includes("application/json")) {
-                    navigate("/dashboard", { replace: true });
-                }
-            })
-            .catch(() => { });
-    }, []);
+        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (token) navigate("/dashboard", { replace: true });
+    }, [navigate]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        setError("");
+        setSubmitting(true);
 
         try {
-            const res = await fetch(apiUrl("/api/v1/login/"), {
+            const res = await fetch(apiUrl("/api/token/"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                credentials: "include",
                 body: JSON.stringify({ username, password }),
             });
 
-            const data = await res.json();
+            const data = await safeJson(res);
 
             if (res.ok) {
-                // Fetch user data immediately to update global state
-                try {
-                    const meRes = await fetch(apiUrl("/api/v1/me/"), { credentials: "include" });
-                    if (meRes.ok) {
-                        const userData = await meRes.json();
-                        if (setUser) setUser(userData);
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch user after login", e);
-                }
+                const access = data?.access;
+                if (!access) throw new Error("Token response missing access token");
+                localStorage.setItem(ACCESS_TOKEN_KEY, access);
                 navigate("/dashboard", { replace: true });
             } else {
-                alert(data.detail || data.message || "Login failed");
+                const message =
+                    data?.detail ||
+                    data?.message ||
+                    (Array.isArray(data?.non_field_errors) ? data.non_field_errors.join(" ") : "") ||
+                    "Invalid username or password";
+                setError(message);
             }
         } catch {
-            alert("Unable to connect to server");
+            setError("Unable to connect to server");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -62,6 +71,11 @@ export default function Login() {
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">
+                        {error ? (
+                            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                {error}
+                            </div>
+                        ) : null}
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Username</label>
                             <div className="mt-1">
@@ -71,6 +85,7 @@ export default function Login() {
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     required
+                                    autoComplete="username"
                                 />
                             </div>
                         </div>
@@ -84,6 +99,7 @@ export default function Login() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
+                                    autoComplete="current-password"
                                 />
                             </div>
                         </div>
@@ -91,9 +107,10 @@ export default function Login() {
                         <div>
                             <button
                                 type="submit"
+                                disabled={submitting}
                                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             >
-                                Sign in
+                                {submitting ? "Signing in…" : "Sign in"}
                             </button>
                         </div>
                     </form>
