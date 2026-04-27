@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 
-import { apiUrl, getAccessToken, getApiBaseUrl, setAccessToken } from "../../api";
+import { apiFetchJson, apiUrl, getAccessToken, getApiBaseUrl, setAccessToken } from "../../api";
 const DEBUG_AUTH =
     (import.meta.env.VITE_DEBUG_AUTH ?? "").toString().trim().toLowerCase() === "true" ||
     import.meta.env.DEV;
@@ -18,6 +18,8 @@ async function safeJson(res) {
 
 export default function Login() {
     const navigate = useNavigate();
+    const outletContext = useOutletContext() || {};
+    const setUser = outletContext.setUser;
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -59,6 +61,24 @@ export default function Login() {
                     return;
                 }
                 setAccessToken(access);
+
+                // Load the profile immediately so Layout/Header/Dashboard have user data
+                // without requiring a full page reload.
+                try {
+                    const me = await apiFetchJson("/api/v1/me/");
+                    if (DEBUG_AUTH) {
+                        console.log("[auth] GET /api/v1/me/ status:", me.res.status);
+                        console.log("[auth] me:", me.data);
+                    }
+                    if (me.res.ok && me.data && typeof setUser === "function") {
+                        setUser(me.data);
+                    }
+                } catch (profileErr) {
+                    if (DEBUG_AUTH) {
+                        console.warn("[auth] profile load failed:", profileErr);
+                    }
+                }
+
                 navigate("/dashboard", { replace: true });
             } else {
                 const message =
