@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { apiUrl } from "../../api";
+import { apiFetch } from "../../api";
 
 export default function EditProduct() {
   const { id } = useParams();
@@ -15,7 +15,7 @@ export default function EditProduct() {
 
   useEffect(() => {
     if (isStoreManagerOrAdmin) {
-      fetch(apiUrl(`/api/v1/product/${id}/`))
+      apiFetch(`/api/v1/product/${id}/`)
         .then(res => res.json())
         .then(data => setProduct(data));
     }
@@ -29,17 +29,10 @@ export default function EditProduct() {
     e.preventDefault();
     setLoading(true);
 
-    const getCookie = (name) => {
-      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-      return v ? v.pop() : '';
-    };
-    const csrf = getCookie('csrftoken');
-
     try {
-      const res = await fetch(apiUrl(`/api/v1/product/${id}/`), {
+      const res = await apiFetch(`/api/v1/product/${id}/`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(product),
       });
 

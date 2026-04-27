@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { apiUrl } from "../../api";
+import { apiFetch } from "../../api";
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
@@ -15,7 +15,7 @@ export default function ProductList() {
 
   const fetchProducts = () => {
     setLoading(true);
-    fetch(apiUrl("/api/v1/product/"))
+    apiFetch("/api/v1/product/")
       .then(res => res.json())
       .then(data => {
         setProducts(data);
@@ -37,16 +37,8 @@ export default function ProductList() {
   const deleteProduct = async (id) => {
     if (!window.confirm("Are you sure you want to delete this product?")) return;
 
-    const getCookie = (name) => {
-      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-      return v ? v.pop() : '';
-    };
-    const csrf = getCookie('csrftoken');
-
-    await fetch(apiUrl(`/api/v1/product/${id}/`), {
+    await apiFetch(`/api/v1/product/${id}/`, {
       method: "DELETE",
-      credentials: "include",
-      headers: { "X-CSRFToken": csrf },
     });
 
     fetchProducts();

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import logoImg from '../../assets/bamulogo.png';
-import { apiUrl } from '../../api';
+import { clearAccessToken } from '../../api';
 
 export default function Header({ user, setUser, loading }) {
     const [open, setOpen] = useState(false);
@@ -10,10 +10,7 @@ export default function Header({ user, setUser, loading }) {
     // 2. Logout function
     const handleLogout = async () => {
         try {
-            await fetch(apiUrl("/api/v1/logout/"), {
-                method: "POST",
-                credentials: "include",
-            });
+            clearAccessToken();
             setUser(null); // Instantly switches UI to show "Login" button
             setOpen(false);
             // navigate to login instead of full reload if state is managed correctly

@@ -6,7 +6,6 @@ from asgiref.sync import async_to_sync
 
 import qrcode
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
 from django.db import transaction as db_transaction
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
@@ -14,6 +13,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from rest_framework.decorators import action
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -102,7 +102,8 @@ def logout_view(request):
         logout(request)
         return JsonResponse({"message": "Logged out successfully"})
 
-@login_required
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def current_user(request):
     # Consider Django's built-in staff/superuser flags as admin by default
     is_admin = bool(request.user.is_staff or request.user.is_superuser)
@@ -110,27 +111,25 @@ def current_user(request):
     role = None
 
     try:
-        # Reverting to your original, explicit query. This is safer!
+        # Explicit lookup to enrich role/name for staff users.
         staff = Staff.objects.get(user=request.user)
-        
-        # Note: If you do apply the models.py refactor later, you will 
-        # need to change these to staff.staff_type.name and staff.is_admin
         role = staff.type.type if staff.type else None
         is_admin = bool(staff.isAdmin) or is_admin
         name = staff.name or name
-        
-    except Staff.DoesNotExist: # <-- Fixes the NameError, no extra imports needed!
+    except Staff.DoesNotExist:
         pass
 
-    return JsonResponse({
-        "username": request.user.username,
-        "email": request.user.email,
-        "name": name,
-        "role": role,
-        "isAdmin": is_admin, 
-        "is_staff": bool(request.user.is_staff),
-        "is_superuser": bool(request.user.is_superuser),
-  })
+    return Response(
+        {
+            "username": request.user.username,
+            "email": request.user.email,
+            "name": name,
+            "role": role,
+            "isAdmin": is_admin,
+            "is_staff": bool(request.user.is_staff),
+            "is_superuser": bool(request.user.is_superuser),
+        }
+    )
 # @login_required
 # def current_user(request):
 #     # Consider Django's built-in staff/superuser flags as admin by default

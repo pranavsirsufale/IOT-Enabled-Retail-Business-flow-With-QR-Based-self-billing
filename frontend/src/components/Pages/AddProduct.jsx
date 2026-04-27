@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import { apiUrl } from "../../api";
+import { apiFetch } from "../../api";
 
 export default function AddProduct() {
   const { user } = useOutletContext();
@@ -28,7 +28,7 @@ export default function AddProduct() {
   // Load categories
   useEffect(() => {
     if (isStoreManagerOrAdmin) {
-      fetch(apiUrl("/api/v1/category/"))
+      apiFetch("/api/v1/category/")
         .then(res => res.json())
         .then(data => setCategories(data));
     }
@@ -37,7 +37,7 @@ export default function AddProduct() {
   // Load subcategories when category changes
   useEffect(() => {
     if (selectedCategory && isStoreManagerOrAdmin) {
-      fetch(apiUrl("/api/v1/sub-category/"))
+      apiFetch("/api/v1/sub-category/")
         .then(res => res.json())
         .then(data => {
           const filtered = data.filter(
@@ -71,23 +71,12 @@ export default function AddProduct() {
     e.preventDefault();
     setLoading(true);
 
-    const getCookie = (name) => {
-      const v = document.cookie.match(
-        "(^|;)\\s*" + name + "\\s*=\\s*([^;]+)"
-      );
-      return v ? v.pop() : "";
-    };
-
-    const csrf = getCookie("csrftoken");
-
     try {
-      const res = await fetch(apiUrl("/api/v1/product/"), {
+      const res = await apiFetch("/api/v1/product/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
         },
-        credentials: "include",
         body: JSON.stringify({
           sku,
           name,

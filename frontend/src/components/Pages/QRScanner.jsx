@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { apiUrl } from "../../api";
+import { apiFetch } from "../../api";
 
 export default function QRScanner() {
     const { user } = useOutletContext();
@@ -118,7 +118,7 @@ export default function QRScanner() {
         setMessage(`Scanned: ${raw}`);
         // treat raw as SKU, try to find product
         try {
-            const res = await fetch(apiUrl("/api/v1/product/"));
+            const res = await apiFetch("/api/v1/product/");
             const products = await res.json();
             const found = products.find((p) => String(p.sku) === String(raw));
             if (found) {
@@ -145,17 +145,11 @@ export default function QRScanner() {
         setCartItems(cart);
         localStorage.setItem(key, JSON.stringify(cart));
 
-        // Sync with server session
+        // Sync with server (JWT auth)
         try {
-            const getCookie = (name) => {
-                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-                return v ? v.pop() : '';
-            };
-            const csrf = getCookie('csrftoken');
-            fetch(apiUrl('/api/v1/cart/'), {
+            apiFetch('/api/v1/cart/', {
                 method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ items: cart })
             }).catch(() => { });
         } catch (e) {
@@ -283,8 +277,8 @@ export default function QRScanner() {
                                 onClick={() => navigate('/cart')}
                                 disabled={cartItems.length === 0}
                                 className={`w-full py-3.5 px-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 ${cartItems.length === 0
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-blue-500/30'
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-blue-500/30'
                                     }`}
                             >
                                 Proceed to Checkout
