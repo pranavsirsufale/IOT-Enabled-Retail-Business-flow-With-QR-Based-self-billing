@@ -15,7 +15,7 @@ SESSION_COOKIE_SECURE = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "https://iot-enabled-retail-business-flow-wi.vercel.app"
+    "https://iot-enabled-retail-business-flow-with-qr-based-self-3fdjsvfqw.vercel.app"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
