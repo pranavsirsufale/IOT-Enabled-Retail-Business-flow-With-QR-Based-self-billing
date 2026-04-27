@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { apiFetch } from "../../api";
 
@@ -17,7 +17,6 @@ export default function Cart() {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [error, setError] = useState(null);
     const [receiptData, setReceiptData] = useState(null);
-    const [isPrinting, setIsPrinting] = useState(false);
 
     // Poll server for cart updates (Scanner Integration)
     useEffect(() => {
@@ -85,16 +84,8 @@ export default function Cart() {
     // Receipt Component for Printing
     const Receipt = ({ data }) => {
         if (!data) return null;
-
-        const items = Array.isArray(data.items) ? data.items : [];
-
         return (
-            <div
-                id="printable-receipt"
-                className="p-4 font-mono text-sm w-[300px]"
-                // Keep mounted for printing, but hide off-screen during normal view.
-                style={{ position: "fixed", left: "-10000px", top: 0 }}
-            >
+            <div id="printable-receipt" className="hidden print:block p-4 font-mono text-sm w-[300px]">
                 <div className="text-center mb-4">
                     <h2 className="text-xl font-bold">SMART STORE</h2>
                     <p>IOT Retail Street</p>
@@ -116,31 +107,13 @@ export default function Cart() {
                         </tr>
                     </thead>
                     <tbody>
-                        {items.length === 0 ? (
-                            <tr>
-                                <td colSpan={3} className="text-center text-gray-500 py-2">
-                                    No items
-                                </td>
+                        {data.items.map((item, i) => (
+                            <tr key={i}>
+                                <td>{item.name}</td>
+                                <td className="text-center">{item.qty}</td>
+                                <td className="text-right">₹{(item.price * item.qty).toFixed(2)}</td>
                             </tr>
-                        ) : (
-                            items.map((item, i) => {
-                                const qty = Number(item?.qty ?? item?.quantity ?? item?.count ?? 1);
-                                const price = Number(item?.price ?? item?.unit_price ?? item?.selling_price ?? 0);
-                                const name = String(item?.name ?? item?.product_name ?? "Item");
-                                const lineTotal = Number.isFinite(qty * price) ? qty * price : 0;
-
-                                return (
-                                    <tr key={i}>
-                                        <td>
-                                            {name}
-                                            {item?.sku ? <span className="text-xs text-gray-500"> ({item.sku})</span> : null}
-                                        </td>
-                                        <td className="text-center">{Number.isFinite(qty) ? qty : 1}</td>
-                                        <td className="text-right">₹{lineTotal.toFixed(2)}</td>
-                                    </tr>
-                                );
-                            })
-                        )}
+                        ))}
                     </tbody>
                 </table>
                 <div className="border-b-2 border-dashed border-gray-400 my-2"></div>
@@ -257,50 +230,14 @@ export default function Cart() {
     };
 
     const handlePrintAndClose = () => {
-        if (!receiptData || isPrinting) return;
-        setIsPrinting(true);
-        // Call print synchronously from the user gesture for maximum browser compatibility.
         window.print();
+        setShowPaymentModal(false);
+        setReceiptData(null); // Reset receipt
+        // Stay on cart page for next customer
     };
-
-    // Cleanup AFTER the print dialog closes.
-    useEffect(() => {
-        if (!isPrinting) return;
-
-        const onAfterPrint = () => {
-            setIsPrinting(false);
-            setShowPaymentModal(false);
-            setReceiptData(null);
-            setPaymentSuccess(false);
-            setError(null);
-        };
-
-        window.addEventListener("afterprint", onAfterPrint);
-
-        return () => {
-            window.removeEventListener("afterprint", onAfterPrint);
-        };
-    }, [isPrinting]);
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
-            <style>{`
-                @media print {
-                    @page { margin: 10mm; }
-                    body { background: white !important; }
-
-                    /* Print ONLY the receipt */
-                    body * { visibility: hidden !important; }
-                    #printable-receipt, #printable-receipt * { visibility: visible !important; }
-                    #printable-receipt {
-                        display: block !important;
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                    }
-                }
-            `}</style>
-
             {/* Header / Top Bar */}
             <div className="bg-white shadow-sm sticky top-0 z-20 px-6 py-4 flex justify-between items-center print:hidden">
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -488,72 +425,12 @@ export default function Cart() {
                                 </div>
                                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
                                 <p className="text-gray-500 mb-6">Your transaction has been recorded.</p>
-
-                                {receiptData ? (
-                                    <div className="text-left bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
-                                        <div className="flex justify-between text-xs text-gray-600">
-                                            <span>Date</span>
-                                            <span className="font-medium text-gray-800">{receiptData.date}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-gray-600 mt-1">
-                                            <span>Receipt ID</span>
-                                            <span className="font-medium text-gray-800">{receiptData.cartId}</span>
-                                        </div>
-
-                                        <div className="border-t border-dashed border-gray-300 my-3"></div>
-
-                                        <div className="text-sm font-semibold text-gray-800 mb-2">Items</div>
-                                        <div className="max-h-40 overflow-auto">
-                                            <table className="w-full text-sm">
-                                                <thead>
-                                                    <tr className="text-xs text-gray-500">
-                                                        <th className="text-left font-medium py-1">Item</th>
-                                                        <th className="text-center font-medium py-1">Qty</th>
-                                                        <th className="text-right font-medium py-1">Total</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {(Array.isArray(receiptData.items) ? receiptData.items : []).map((item, i) => {
-                                                        const qty = Number(item?.qty ?? item?.quantity ?? item?.count ?? 1);
-                                                        const price = Number(item?.price ?? item?.unit_price ?? item?.selling_price ?? 0);
-                                                        const name = String(item?.name ?? item?.product_name ?? "Item");
-                                                        const lineTotal = Number.isFinite(qty * price) ? qty * price : 0;
-
-                                                        return (
-                                                            <tr key={i} className="border-t border-gray-200">
-                                                                <td className="py-2 pr-2 text-gray-800">
-                                                                    <div className="font-medium leading-4">{name}</div>
-                                                                    {item?.sku ? <div className="text-xs text-gray-500">SKU: {item.sku}</div> : null}
-                                                                </td>
-                                                                <td className="py-2 text-center text-gray-700">{Number.isFinite(qty) ? qty : 1}</td>
-                                                                <td className="py-2 text-right font-semibold text-gray-900">₹{lineTotal.toFixed(2)}</td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-
-                                        <div className="border-t border-dashed border-gray-300 my-3"></div>
-
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm font-semibold text-gray-800">Grand Total</span>
-                                            <span className="text-lg font-bold text-gray-900">₹{Number(receiptData.total ?? 0).toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-gray-600 mt-1">
-                                            <span>Payment</span>
-                                            <span className="font-medium text-gray-800">{receiptData.method}</span>
-                                        </div>
-                                    </div>
-                                ) : null}
-
                                 <button
                                     onClick={handlePrintAndClose}
-                                    disabled={isPrinting}
                                     className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                                    {isPrinting ? "Opening print…" : "Print Receipt & Finish"}
+                                    Print Receipt & Finish
                                 </button>
                             </div>
                         )}
