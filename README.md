@@ -19,6 +19,12 @@ The system integrates a React frontend, an asynchronous Django Channels backend,
 *   **Role-Based Access Control:** Differentiated access for Admins, Store Managers, and Staff Members.
 *   **Product & Inventory Management:** A comprehensive interface for administrators to add, edit, and manage products and categories.
 
+
+## Deploy notes (Render)
+
+- Set `DATABASE_URL` in your Render service environment.
+    - Without it, Django will fall back to local MySQL settings (which will not exist on Render) and the build will fail.
+- Optional demo mode: set `DJANGO_USE_SQLITE=true` to run with SQLite when you don't have a managed DB.
 ## Technology Stack
 
 | Component | Technology                                          |
