@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { apiUrl } from "../../api";
+import { apiFetch } from "../../api";
 
 export default function Cart() {
     const { user } = useOutletContext();
@@ -24,7 +24,7 @@ export default function Cart() {
 
         const fetchCart = async () => {
             try {
-                const res = await fetch(apiUrl('/api/v1/cart/'));
+                const res = await apiFetch('/api/v1/cart/');
                 if (!res.ok) throw new Error(res.status);
 
                 const data = await res.json();
@@ -44,11 +44,19 @@ export default function Cart() {
 
         // Connect to WebSocket for instant updates
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Connect directly to the port where Django Daphne is running (8000), not the Vite dev server (5173/etc)
-        // If the frontend and backend are hosted on the same domain, then use window.location.host
-        const wsUrl = process.env.NODE_ENV === 'development'
-            ? `ws://localhost:8000/ws/cart/`
-            : `${protocol}//${window.location.host}/ws/cart/`;
+
+        let wsUrl;
+        if (import.meta.env.DEV) {
+            // Connect directly to the port where Django Daphne is running (8000), not the Vite dev server (5173/etc)
+            wsUrl = `ws://localhost:8000/ws/cart/`;
+        } else if (import.meta.env.VITE_API_URL) {
+            const backend = new URL(import.meta.env.VITE_API_URL);
+            const backendWsProto = backend.protocol === 'https:' ? 'wss:' : 'ws:';
+            wsUrl = `${backendWsProto}//${backend.host}/ws/cart/`;
+        } else {
+            // Fallback: assume backend is hosted with the frontend
+            wsUrl = `${protocol}//${window.location.host}/ws/cart/`;
+        }
 
         const ws = new WebSocket(wsUrl);
 
@@ -134,26 +142,9 @@ export default function Cart() {
         localStorage.setItem("cart", JSON.stringify(newCart));
         setCart(newCart);
         try {
-            const getCookie = (name) => {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
-                }
-                return cookieValue;
-            };
-            const csrf = getCookie('csrftoken');
-
-            fetch(apiUrl('/api/v1/cart/'), {
+            apiFetch('/api/v1/cart/', {
                 method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ items: newCart })
             }).catch(() => { });
         } catch (e) {
@@ -197,27 +188,9 @@ export default function Cart() {
     const handleActualTransaction = async () => {
         setLoadingCheckout(true);
         try {
-            // Read CSRF token from cookie
-            const getCookie = (name) => {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
-                }
-                return cookieValue;
-            };
-            const csrf = getCookie('csrftoken');
-
-            const res = await fetch(apiUrl('/api/v1/transactions/'), {
+            const res = await apiFetch('/api/v1/transactions/', {
                 method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ items: cart })
             });
 

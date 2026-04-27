@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { apiUrl } from "../../api";
-
-const ACCESS_TOKEN_KEY = "accessToken";
+import { apiUrl, getAccessToken, getApiBaseUrl, setAccessToken } from "../../api";
+const DEBUG_AUTH =
+    (import.meta.env.VITE_DEBUG_AUTH ?? "").toString().trim().toLowerCase() === "true" ||
+    import.meta.env.DEV;
 
 async function safeJson(res) {
     const contentType = res.headers.get("content-type") || "";
@@ -23,7 +24,7 @@ export default function Login() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        const token = getAccessToken();
         if (token) navigate("/dashboard", { replace: true });
     }, [navigate]);
 
@@ -33,18 +34,31 @@ export default function Login() {
         setSubmitting(true);
 
         try {
-            const res = await fetch(apiUrl("/api/token/"), {
+            const url = apiUrl("/api/token/");
+            if (DEBUG_AUTH) {
+                console.log("[auth] VITE_API_URL:", getApiBaseUrl());
+                console.log("[auth] POST", url);
+            }
+
+            const res = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
             });
 
             const data = await safeJson(res);
+            if (DEBUG_AUTH) {
+                console.log("[auth] status:", res.status);
+                console.log("[auth] response:", data);
+            }
 
             if (res.ok) {
                 const access = data?.access;
-                if (!access) throw new Error("Token response missing access token");
-                localStorage.setItem(ACCESS_TOKEN_KEY, access);
+                if (!access) {
+                    setError("Login failed: server did not return an access token");
+                    return;
+                }
+                setAccessToken(access);
                 navigate("/dashboard", { replace: true });
             } else {
                 const message =
@@ -54,8 +68,13 @@ export default function Login() {
                     "Invalid username or password";
                 setError(message);
             }
-        } catch {
-            setError("Unable to connect to server");
+        } catch (err) {
+            // Network/DNS/CORS errors typically surface as TypeError in fetch.
+            if (err instanceof TypeError) {
+                setError("Unable to connect to server");
+            } else {
+                setError(err?.message || "Login failed");
+            }
         } finally {
             setSubmitting(false);
         }

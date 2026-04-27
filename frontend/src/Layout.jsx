@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Footer, Header } from './components'
 import { Outlet } from 'react-router-dom'
-import { apiUrl } from './api'
+import { apiFetch, clearAccessToken } from './api'
 
 function Layout() {
   const [user, setUser] = useState(null);
@@ -9,12 +9,14 @@ function Layout() {
 
   // Check if user is logged in
   useEffect(() => {
-    fetch(apiUrl("/api/v1/me/"), { credentials: "include" })
-      .then((res) => {
-        if (!res.ok || res.redirected || !res.headers.get("content-type")?.includes("application/json")) {
-          throw new Error("Guest user");
+    apiFetch("/api/v1/me/")
+      .then(async (res) => {
+        if (res.status === 401) {
+          clearAccessToken();
+          throw new Error("Unauthorized");
         }
-        return res.json();
+        if (!res.ok) throw new Error("Guest user");
+        return await res.json();
       })
       .then((data) => {
         setUser(data);

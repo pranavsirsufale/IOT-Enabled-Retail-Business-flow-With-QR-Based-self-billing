@@ -1,8 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom";
-
-const ACCESS_TOKEN_KEY = "accessToken";
+import { getAccessToken } from "../api";
 
 export default function ProtectedRoute() {
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const token = getAccessToken();
     return token ? <Outlet /> : <Navigate to="/login" replace />;
 }

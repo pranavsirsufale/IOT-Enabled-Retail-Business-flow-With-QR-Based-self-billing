@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { apiUrl } from "../../api";
+import { apiFetch, clearAccessToken } from "../../api";
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -10,7 +10,7 @@ export default function Profile() {
 
   // Check if user is logged in on component mount
   useEffect(() => {
-    fetch(apiUrl("/api/v1/me/"), { credentials: "include" })
+    apiFetch("/api/v1/me/")
       .then((res) => {
         if (!res.ok) throw new Error("Unauthorized");
         return res.json();
@@ -27,10 +27,7 @@ export default function Profile() {
 
   const handleLogout = async () => {
     try {
-      await fetch(apiUrl("/api/v1/logout/"), {
-        method: "POST",
-        credentials: "include",
-      });
+      clearAccessToken();
 
       // IMPORTANT: Clear user state to show Login button immediately
       setUser(null);

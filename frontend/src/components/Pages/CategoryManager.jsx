@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiUrl } from "../../api";
+import { apiFetch } from "../../api";
 
 export default function CategoryManager() {
   const { user } = useOutletContext();
@@ -13,7 +13,7 @@ export default function CategoryManager() {
 
   // Load categories
   const loadCategories = () => {
-    fetch(apiUrl("/api/v1/category/"))
+    apiFetch("/api/v1/category/")
       .then(res => res.json())
       .then(data => setCategories(data));
   };
@@ -32,16 +32,9 @@ export default function CategoryManager() {
   const handleAddCategory = async (e) => {
     e.preventDefault();
 
-    const getCookie = (name) => {
-      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-      return v ? v.pop() : '';
-    };
-    const csrf = getCookie('csrftoken');
-
-    const res = await fetch(apiUrl("/api/v1/category/"), {
+    const res = await apiFetch("/api/v1/category/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: categoryName }),
     });
 
@@ -59,16 +52,9 @@ export default function CategoryManager() {
   const handleAddSubCategory = async (e) => {
     e.preventDefault();
 
-    const getCookie = (name) => {
-      const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-      return v ? v.pop() : '';
-    };
-    const csrf = getCookie('csrftoken');
-
-    const res = await fetch(apiUrl("/api/v1/sub-category/"), {
+    const res = await apiFetch("/api/v1/sub-category/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         subCategory: subCategoryName,
         category: Number(selectedCategory),

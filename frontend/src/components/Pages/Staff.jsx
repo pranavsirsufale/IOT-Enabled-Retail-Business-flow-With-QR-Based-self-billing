@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { apiUrl } from "../../api";
+import { apiFetch } from "../../api";
 
 export default function Staff() {
     const { user } = useOutletContext();
@@ -21,7 +21,7 @@ export default function Staff() {
     const [selectedType, setSelectedType] = useState("");
 
     const loadTypes = () => {
-        fetch(apiUrl("/api/v1/staff-types/"), { credentials: "include" })
+        apiFetch("/api/v1/staff-types/")
             .then((r) => r.json())
             .then((data) => setStaffTypes(data))
             .catch(() => setStaffTypes([]));
@@ -30,7 +30,7 @@ export default function Staff() {
     useEffect(() => {
         if (!isAllowed) return;
 
-        fetch(apiUrl("/api/v1/me/"), { credentials: "include" })
+        apiFetch("/api/v1/me/")
             .then((r) => r.json())
             .then((data) => {
                 setMe(data);
@@ -47,16 +47,9 @@ export default function Staff() {
     const handleAddType = async (e) => {
         e.preventDefault();
         try {
-            const getCookie = (name) => {
-                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-                return v ? v.pop() : '';
-            };
-            const csrf = getCookie('csrftoken');
-
-            const res = await fetch(apiUrl("/api/v1/staff-types/"), {
+            const res = await apiFetch("/api/v1/staff-types/", {
                 method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ type: newType }),
             });
             if (res.ok) {
@@ -76,16 +69,9 @@ export default function Staff() {
     const handleAddStaff = async (e) => {
         e.preventDefault();
         try {
-            const getCookie = (name) => {
-                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-                return v ? v.pop() : '';
-            };
-            const csrf = getCookie('csrftoken');
-
-            const res = await fetch(apiUrl("/api/v1/staff/"), {
+            const res = await apiFetch("/api/v1/staff/", {
                 method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password, name, type: Number(selectedType), isAdmin: newStaffIsAdmin, email, phone }),
             });
 
