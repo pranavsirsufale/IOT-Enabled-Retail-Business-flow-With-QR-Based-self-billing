@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { apiFetch } from "../../api";
 
@@ -230,14 +230,46 @@ export default function Cart() {
     };
 
     const handlePrintAndClose = () => {
+        if (!receiptData) return;
+
+        const cleanup = () => {
+            window.removeEventListener("afterprint", cleanup);
+            setShowPaymentModal(false);
+            setReceiptData(null); // Reset receipt AFTER print
+            // Stay on cart page for next customer
+        };
+
+        // Ensure we don't close/reset before the browser captures print preview.
+        window.addEventListener("afterprint", cleanup, { once: true });
+
+        // Calling print directly from the click handler keeps popup blockers happy.
         window.print();
-        setShowPaymentModal(false);
-        setReceiptData(null); // Reset receipt
-        // Stay on cart page for next customer
+
+        // Fallback: some browsers/devices don't reliably fire `afterprint`.
+        setTimeout(() => cleanup(), 1500);
     };
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
+            <style>{`
+                @media print {
+                    @page { margin: 10mm; }
+
+                    /* Print only the receipt */
+                    body * { visibility: hidden !important; }
+                    #printable-receipt, #printable-receipt * { visibility: visible !important; }
+                    #printable-receipt {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        display: block !important;
+                        width: 300px;
+                    }
+
+                    /* Avoid clipped shadows/backgrounds on some browsers */
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                }
+            `}</style>
             {/* Header / Top Bar */}
             <div className="bg-white shadow-sm sticky top-0 z-20 px-6 py-4 flex justify-between items-center print:hidden">
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
