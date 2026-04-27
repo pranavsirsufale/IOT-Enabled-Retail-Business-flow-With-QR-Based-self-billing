@@ -2,7 +2,17 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user } = useOutletContext();
+  const outletContext = useOutletContext() || {};
+  const user = outletContext.user;
+  const loading = outletContext.loading;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-sm text-gray-600">Loading…</div>
+      </div>
+    );
+  }
 
   const isStoreManagerOrAdmin =
     user?.isAdmin ||
@@ -10,6 +20,19 @@ export default function Dashboard() {
     user?.role?.toLowerCase() === "admin";
 
   const isStaffMember = user?.role?.toLowerCase() === "staff member";
+
+  // If token exists but user profile couldn't be loaded, avoid crashing.
+  // ProtectedRoute will redirect on missing token; this is just a safe UI fallback.
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-8">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900">Dashboard</h2>
+          <p className="mt-2 text-sm text-gray-600">Signed in, but user profile couldn't be loaded.</p>
+        </div>
+      </div>
+    );
+  }
 
   const actions = [
     {

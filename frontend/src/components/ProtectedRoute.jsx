@@ -1,7 +1,8 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useOutletContext } from "react-router-dom";
 import { getAccessToken } from "../api";
 
 export default function ProtectedRoute() {
     const token = getAccessToken();
-    return token ? <Outlet /> : <Navigate to="/login" replace />;
+    const outletContext = useOutletContext();
+    return token ? <Outlet context={outletContext} /> : <Navigate to="/login" replace />;
 }
