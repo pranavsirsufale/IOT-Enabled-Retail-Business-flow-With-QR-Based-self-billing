@@ -123,4 +123,7 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+# Required for `collectstatic` (e.g. on Render/Heroku-like deploys).
+STATIC_ROOT = BASE_DIR / 'staticfiles'
