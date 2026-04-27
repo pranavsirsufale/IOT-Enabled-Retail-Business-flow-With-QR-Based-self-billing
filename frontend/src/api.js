@@ -24,15 +24,24 @@ export function clearAccessToken() {
 }
 
 export function apiUrl(path) {
-    if (!baseUrl) {
-        throw new Error(
-            "VITE_API_URL is not set. Set it to your backend, e.g. https://iot-v52t.onrender.com",
-        );
-    }
+    if (!path) return baseUrl || "";
 
-    if (!path) return baseUrl;
+    // Allow passing absolute URLs through unchanged.
+    if (/^https?:\/\//i.test(path)) return path;
 
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+    if (!baseUrl) {
+        // Avoid hard crashes in production builds when Netlify env vars are misconfigured.
+        // This will fall back to a relative path, which may still fail at runtime,
+        // but it won't take down the whole SPA with an exception.
+        if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn("[api] VITE_API_URL is not set; falling back to relative URL:", normalizedPath);
+        }
+        return normalizedPath;
+    }
+
     return `${baseUrl}${normalizedPath}`;
 }
 
