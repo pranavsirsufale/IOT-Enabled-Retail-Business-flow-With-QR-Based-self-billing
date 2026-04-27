@@ -294,9 +294,9 @@ export default function Cart() {
                     #printable-receipt, #printable-receipt * { visibility: visible !important; }
                     #printable-receipt {
                         display: block !important;
-                        position: absolute;
-                        left: 0;
-                        top: 0;
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
                     }
                 }
             `}</style>
@@ -488,6 +488,65 @@ export default function Cart() {
                                 </div>
                                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
                                 <p className="text-gray-500 mb-6">Your transaction has been recorded.</p>
+
+                                {receiptData ? (
+                                    <div className="text-left bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+                                        <div className="flex justify-between text-xs text-gray-600">
+                                            <span>Date</span>
+                                            <span className="font-medium text-gray-800">{receiptData.date}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-gray-600 mt-1">
+                                            <span>Receipt ID</span>
+                                            <span className="font-medium text-gray-800">{receiptData.cartId}</span>
+                                        </div>
+
+                                        <div className="border-t border-dashed border-gray-300 my-3"></div>
+
+                                        <div className="text-sm font-semibold text-gray-800 mb-2">Items</div>
+                                        <div className="max-h-40 overflow-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-xs text-gray-500">
+                                                        <th className="text-left font-medium py-1">Item</th>
+                                                        <th className="text-center font-medium py-1">Qty</th>
+                                                        <th className="text-right font-medium py-1">Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {(Array.isArray(receiptData.items) ? receiptData.items : []).map((item, i) => {
+                                                        const qty = Number(item?.qty ?? item?.quantity ?? item?.count ?? 1);
+                                                        const price = Number(item?.price ?? item?.unit_price ?? item?.selling_price ?? 0);
+                                                        const name = String(item?.name ?? item?.product_name ?? "Item");
+                                                        const lineTotal = Number.isFinite(qty * price) ? qty * price : 0;
+
+                                                        return (
+                                                            <tr key={i} className="border-t border-gray-200">
+                                                                <td className="py-2 pr-2 text-gray-800">
+                                                                    <div className="font-medium leading-4">{name}</div>
+                                                                    {item?.sku ? <div className="text-xs text-gray-500">SKU: {item.sku}</div> : null}
+                                                                </td>
+                                                                <td className="py-2 text-center text-gray-700">{Number.isFinite(qty) ? qty : 1}</td>
+                                                                <td className="py-2 text-right font-semibold text-gray-900">₹{lineTotal.toFixed(2)}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="border-t border-dashed border-gray-300 my-3"></div>
+
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-semibold text-gray-800">Grand Total</span>
+                                            <span className="text-lg font-bold text-gray-900">₹{Number(receiptData.total ?? 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-gray-600 mt-1">
+                                            <span>Payment</span>
+                                            <span className="font-medium text-gray-800">{receiptData.method}</span>
+                                        </div>
+                                    </div>
+                                ) : null}
+
                                 <button
                                     onClick={handlePrintAndClose}
                                     disabled={isPrinting}
