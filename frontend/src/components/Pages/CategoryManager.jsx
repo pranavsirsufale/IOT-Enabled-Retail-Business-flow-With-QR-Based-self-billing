@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
+import { apiUrl } from "../../api";
 
 export default function CategoryManager() {
   const { user } = useOutletContext();
@@ -12,7 +13,7 @@ export default function CategoryManager() {
 
   // Load categories
   const loadCategories = () => {
-    fetch("/api/v1/category/")
+    fetch(apiUrl("/api/v1/category/"))
       .then(res => res.json())
       .then(data => setCategories(data));
   };
@@ -37,7 +38,7 @@ export default function CategoryManager() {
     };
     const csrf = getCookie('csrftoken');
 
-    const res = await fetch("/api/v1/category/", {
+    const res = await fetch(apiUrl("/api/v1/category/"), {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
       credentials: "include",
@@ -64,7 +65,7 @@ export default function CategoryManager() {
     };
     const csrf = getCookie('csrftoken');
 
-    const res = await fetch("/api/v1/sub-category/", {
+    const res = await fetch(apiUrl("/api/v1/sub-category/"), {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
       credentials: "include",

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
+import { apiUrl } from "../../api";
 
 export default function Login() {
     const navigate = useNavigate();
@@ -9,7 +10,7 @@ export default function Login() {
 
     useEffect(() => {
         // Double check but the context check is better
-        fetch("/api/v1/me/", { credentials: "include" })
+        fetch(apiUrl("/api/v1/me/"), { credentials: "include" })
             .then((res) => {
                 if (res.ok && !res.redirected && res.headers.get("content-type")?.includes("application/json")) {
                     navigate("/dashboard", { replace: true });
@@ -22,7 +23,7 @@ export default function Login() {
         e.preventDefault();
 
         try {
-            const res = await fetch("/api/v1/login/", {
+            const res = await fetch(apiUrl("/api/v1/login/"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -34,7 +35,7 @@ export default function Login() {
             if (res.ok) {
                 // Fetch user data immediately to update global state
                 try {
-                    const meRes = await fetch("/api/v1/me/", { credentials: "include" });
+                    const meRes = await fetch(apiUrl("/api/v1/me/"), { credentials: "include" });
                     if (meRes.ok) {
                         const userData = await meRes.json();
                         if (setUser) setUser(userData);

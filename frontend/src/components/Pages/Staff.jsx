@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { apiUrl } from "../../api";
 
 export default function Staff() {
     const { user } = useOutletContext();
@@ -20,7 +21,7 @@ export default function Staff() {
     const [selectedType, setSelectedType] = useState("");
 
     const loadTypes = () => {
-        fetch("/api/v1/staff-types/", { credentials: "include" })
+        fetch(apiUrl("/api/v1/staff-types/"), { credentials: "include" })
             .then((r) => r.json())
             .then((data) => setStaffTypes(data))
             .catch(() => setStaffTypes([]));
@@ -29,7 +30,7 @@ export default function Staff() {
     useEffect(() => {
         if (!isAllowed) return;
 
-        fetch("/api/v1/me/", { credentials: "include" })
+        fetch(apiUrl("/api/v1/me/"), { credentials: "include" })
             .then((r) => r.json())
             .then((data) => {
                 setMe(data);
@@ -52,7 +53,7 @@ export default function Staff() {
             };
             const csrf = getCookie('csrftoken');
 
-            const res = await fetch("/api/v1/staff-types/", {
+            const res = await fetch(apiUrl("/api/v1/staff-types/"), {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
@@ -81,7 +82,7 @@ export default function Staff() {
             };
             const csrf = getCookie('csrftoken');
 
-            const res = await fetch("/api/v1/staff/", {
+            const res = await fetch(apiUrl("/api/v1/staff/"), {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },

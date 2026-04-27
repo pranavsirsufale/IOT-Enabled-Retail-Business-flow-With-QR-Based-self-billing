@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import logoImg from '../../assets/bamulogo.png';
+import { apiUrl } from '../../api';
 
 export default function Header({ user, setUser, loading }) {
     const [open, setOpen] = useState(false);
@@ -9,7 +10,7 @@ export default function Header({ user, setUser, loading }) {
     // 2. Logout function
     const handleLogout = async () => {
         try {
-            await fetch("/api/v1/logout/", {
+            await fetch(apiUrl("/api/v1/logout/"), {
                 method: "POST",
                 credentials: "include",
             });

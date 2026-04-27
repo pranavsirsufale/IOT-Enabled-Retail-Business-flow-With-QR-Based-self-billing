@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
+import { apiUrl } from "../../api";
 
 export default function Cart() {
     const { user } = useOutletContext();
@@ -23,7 +24,7 @@ export default function Cart() {
 
         const fetchCart = async () => {
             try {
-                const res = await fetch('/api/v1/cart/');
+                const res = await fetch(apiUrl('/api/v1/cart/'));
                 if (!res.ok) throw new Error(res.status);
 
                 const data = await res.json();
@@ -149,7 +150,7 @@ export default function Cart() {
             };
             const csrf = getCookie('csrftoken');
 
-            fetch('/api/v1/cart/', {
+            fetch(apiUrl('/api/v1/cart/'), {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
@@ -213,7 +214,7 @@ export default function Cart() {
             };
             const csrf = getCookie('csrftoken');
 
-            const res = await fetch('/api/v1/transactions/', {
+            const res = await fetch(apiUrl('/api/v1/transactions/'), {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },

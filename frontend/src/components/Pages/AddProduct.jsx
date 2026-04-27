@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
+import { apiUrl } from "../../api";
 
 export default function AddProduct() {
   const { user } = useOutletContext();
@@ -27,7 +28,7 @@ export default function AddProduct() {
   // Load categories
   useEffect(() => {
     if (isStoreManagerOrAdmin) {
-      fetch("/api/v1/category/")
+      fetch(apiUrl("/api/v1/category/"))
         .then(res => res.json())
         .then(data => setCategories(data));
     }
@@ -36,7 +37,7 @@ export default function AddProduct() {
   // Load subcategories when category changes
   useEffect(() => {
     if (selectedCategory && isStoreManagerOrAdmin) {
-      fetch("/api/v1/sub-category/")
+      fetch(apiUrl("/api/v1/sub-category/"))
         .then(res => res.json())
         .then(data => {
           const filtered = data.filter(
@@ -80,7 +81,7 @@ export default function AddProduct() {
     const csrf = getCookie("csrftoken");
 
     try {
-      const res = await fetch("/api/v1/product/", {
+      const res = await fetch(apiUrl("/api/v1/product/"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
