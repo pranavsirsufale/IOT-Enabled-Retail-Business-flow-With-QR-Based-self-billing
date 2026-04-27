@@ -17,6 +17,7 @@ export default function Cart() {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [error, setError] = useState(null);
     const [receiptData, setReceiptData] = useState(null);
+    const [isPrinting, setIsPrinting] = useState(false);
 
     // Poll server for cart updates (Scanner Integration)
     useEffect(() => {
@@ -230,46 +231,54 @@ export default function Cart() {
     };
 
     const handlePrintAndClose = () => {
-        if (!receiptData) return;
+        if (!receiptData || isPrinting) return;
+        setIsPrinting(true);
+    };
 
-        const cleanup = () => {
-            window.removeEventListener("afterprint", cleanup);
+    // Print flow: ensure receipt stays mounted/visible for print preview.
+    useEffect(() => {
+        if (!isPrinting) return;
+
+        const onAfterPrint = () => {
+            setIsPrinting(false);
             setShowPaymentModal(false);
-            setReceiptData(null); // Reset receipt AFTER print
-            // Stay on cart page for next customer
+            setReceiptData(null);
+            setPaymentSuccess(false);
+            setError(null);
         };
 
-        // Ensure we don't close/reset before the browser captures print preview.
-        window.addEventListener("afterprint", cleanup, { once: true });
+        window.addEventListener("afterprint", onAfterPrint);
 
-        // Calling print directly from the click handler keeps popup blockers happy.
-        window.print();
+        // Let React commit DOM updates before opening the print dialog.
+        const rafId = window.requestAnimationFrame(() => {
+            window.print();
+        });
 
-        // Fallback: some browsers/devices don't reliably fire `afterprint`.
-        setTimeout(() => cleanup(), 1500);
-    };
+        return () => {
+            window.removeEventListener("afterprint", onAfterPrint);
+            window.cancelAnimationFrame(rafId);
+        };
+    }, [isPrinting]);
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
             <style>{`
                 @media print {
                     @page { margin: 10mm; }
+                    body { background: white !important; }
 
-                    /* Print only the receipt */
+                    /* Print ONLY the receipt */
                     body * { visibility: hidden !important; }
                     #printable-receipt, #printable-receipt * { visibility: visible !important; }
                     #printable-receipt {
+                        display: block !important;
                         position: absolute;
                         left: 0;
                         top: 0;
-                        display: block !important;
-                        width: 300px;
                     }
-
-                    /* Avoid clipped shadows/backgrounds on some browsers */
-                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 }
             `}</style>
+
             {/* Header / Top Bar */}
             <div className="bg-white shadow-sm sticky top-0 z-20 px-6 py-4 flex justify-between items-center print:hidden">
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -459,10 +468,11 @@ export default function Cart() {
                                 <p className="text-gray-500 mb-6">Your transaction has been recorded.</p>
                                 <button
                                     onClick={handlePrintAndClose}
+                                    disabled={isPrinting}
                                     className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                                    Print Receipt & Finish
+                                    {isPrinting ? "Opening print…" : "Print Receipt & Finish"}
                                 </button>
                             </div>
                         )}
